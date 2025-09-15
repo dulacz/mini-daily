@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>{{ today }}</h2>
+<ul class="task-list">
+    {% for t in tasks %}
+    <li>
+        <span class="task-name">{{ t }}</span>
+        {% if status.get(t) %}
+        <span class="done">✅ 已完成</span>
+        <a class="toggle" href="/toggle/{{t}}">撤销</a>
+        {% else %}
+        <span class="not-done">❌ 未完成</span>
+        <a class="toggle" href="/toggle/{{t}}">完成</a>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+<p class="hint">修改任务：编辑 <code>app/core/config.py</code> 后重启。</p>
+{% endblock %}

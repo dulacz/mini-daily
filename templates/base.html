@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <title>每日打卡</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+
+<body>
+    <header>
+        <h1>每日打卡</h1>
+        <nav>
+            <a href="/">今天</a> |
+            <a href="/history">历史</a>
+        </nav>
+        <hr />
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    <footer>
+        <hr />
+        <p class="foot-note">本地局域网自用 · 数据: data/checkins.db</p>
+    </footer>
+</body>
+
+</html>
