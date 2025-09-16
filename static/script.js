@@ -190,6 +190,19 @@ class WellnessTracker {
                         </button>
                     `).join('')}
                 </div>
+                <div class="task-note-section" data-task="${taskId}">
+                    <div class="note-display" id="${taskId}NoteDisplay" style="display: none;">
+                        <div class="note-content" id="${taskId}NoteContent"></div>
+                        <button class="note-edit-btn" data-task="${taskId}">Edit Note</button>
+                    </div>
+                    <div class="note-input-section" id="${taskId}NoteInput">
+                        <textarea class="note-input" id="${taskId}NoteTextarea" placeholder="Add a note about your progress..." rows="2"></textarea>
+                        <div class="note-buttons">
+                            <button class="note-save-btn" data-task="${taskId}">Save Note</button>
+                            <button class="note-cancel-btn" data-task="${taskId}" style="display: none;">Cancel</button>
+                        </div>
+                    </div>
+                </div>
             `;
 
             tasksContainer.appendChild(taskCard);
@@ -197,6 +210,9 @@ class WellnessTracker {
 
         // Re-setup event listeners for the new buttons
         this.setupTaskEventListeners();
+
+        // Load existing notes for tasks
+        this.loadTaskNotes();
     }
 
     /**
@@ -218,18 +234,30 @@ class WellnessTracker {
 
                 // Update today's data with backend data
                 if (data.status) {
-                    this.taskData.daily[today] = {
-                        ...this.taskData.daily[today],
-                        ...data.status,
-                        completed: []
-                    };
+                    // Handle new data format where status contains objects with level and note
+                    const dailyData = { completed: [] };
 
-                    // Rebuild completed array based on levels
                     Object.keys(data.status).forEach(task => {
-                        if (data.status[task] > 0) {
-                            this.taskData.daily[today].completed.push(task);
+                        const taskData = data.status[task];
+                        if (typeof taskData === 'object' && taskData.level !== undefined) {
+                            // New format with level and note
+                            dailyData[task] = taskData.level;
+                            if (taskData.level > 0) {
+                                dailyData.completed.push(task);
+                            }
+                        } else {
+                            // Legacy format - just level
+                            dailyData[task] = taskData;
+                            if (taskData > 0) {
+                                dailyData.completed.push(task);
+                            }
                         }
                     });
+
+                    this.taskData.daily[today] = {
+                        ...this.taskData.daily[today],
+                        ...dailyData
+                    };
 
                     this.saveData();
                     await this.updateDisplay();
@@ -502,6 +530,21 @@ class WellnessTracker {
         document.querySelectorAll('.star-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.handleStarClick(e));
         });
+
+        // Note save button clicks
+        document.querySelectorAll('.note-save-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.handleNoteSave(e));
+        });
+
+        // Note edit button clicks
+        document.querySelectorAll('.note-edit-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.handleNoteEdit(e));
+        });
+
+        // Note cancel button clicks
+        document.querySelectorAll('.note-cancel-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.handleNoteCancel(e));
+        });
     }
 
     /**
@@ -616,6 +659,146 @@ class WellnessTracker {
             }, 600);
         } else {
             taskCard.classList.remove('completed');
+        }
+    }
+
+    /**
+     * Handle note save button clicks
+     * @param {Event} event - Click event
+     */
+    async handleNoteSave(event) {
+        const btn = event.currentTarget;
+        const task = btn.dataset.task;
+        const textarea = document.getElementById(`${task}NoteTextarea`);
+        const note = textarea.value.trim();
+
+        try {
+            // Call backend API to save note
+            const response = await fetch(`/api/user/${this.currentUser}/task/note`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    task: task,
+                    note: note
+                })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    // Update note display
+                    this.updateNoteDisplay(task, note);
+                    // Show success feedback
+                    btn.textContent = 'Saved!';
+                    btn.style.background = 'var(--success-color)';
+                    setTimeout(() => {
+                        btn.textContent = 'Save Note';
+                        btn.style.background = '';
+                    }, 2000);
+                }
+            }
+        } catch (error) {
+            console.error('Error saving note:', error);
+            // Show error feedback
+            btn.textContent = 'Error!';
+            btn.style.background = 'var(--error-color, #ef4444)';
+            setTimeout(() => {
+                btn.textContent = 'Save Note';
+                btn.style.background = '';
+            }, 2000);
+        }
+    }
+
+    /**
+     * Handle note edit button clicks
+     * @param {Event} event - Click event
+     */
+    handleNoteEdit(event) {
+        const btn = event.currentTarget;
+        const task = btn.dataset.task;
+        const noteDisplay = document.getElementById(`${task}NoteDisplay`);
+        const noteInput = document.getElementById(`${task}NoteInput`);
+        const textarea = document.getElementById(`${task}NoteTextarea`);
+        const noteContent = document.getElementById(`${task}NoteContent`);
+        const cancelBtn = noteInput.querySelector('.note-cancel-btn');
+
+        // Switch to edit mode
+        noteDisplay.style.display = 'none';
+        noteInput.style.display = 'block';
+        cancelBtn.style.display = 'inline-block';
+
+        // Populate textarea with current note content
+        textarea.value = noteContent.textContent;
+        textarea.focus();
+    }
+
+    /**
+     * Handle note cancel button clicks
+     * @param {Event} event - Click event
+     */
+    handleNoteCancel(event) {
+        const btn = event.currentTarget;
+        const task = btn.dataset.task;
+        const noteDisplay = document.getElementById(`${task}NoteDisplay`);
+        const noteInput = document.getElementById(`${task}NoteInput`);
+        const textarea = document.getElementById(`${task}NoteTextarea`);
+
+        // Reset textarea and switch back to display mode
+        textarea.value = '';
+        btn.style.display = 'none';
+
+        // Only show display if there's a note to show
+        if (noteDisplay.querySelector('.note-content').textContent.trim()) {
+            noteDisplay.style.display = 'block';
+            noteInput.style.display = 'none';
+        }
+    }
+
+    /**
+     * Update note display for a task
+     * @param {string} task - Task name
+     * @param {string} note - Note text
+     */
+    updateNoteDisplay(task, note) {
+        const noteDisplay = document.getElementById(`${task}NoteDisplay`);
+        const noteInput = document.getElementById(`${task}NoteInput`);
+        const noteContent = document.getElementById(`${task}NoteContent`);
+        const textarea = document.getElementById(`${task}NoteTextarea`);
+        const cancelBtn = noteInput.querySelector('.note-cancel-btn');
+
+        noteContent.textContent = note;
+
+        if (note.trim()) {
+            // Show note display, hide input
+            noteDisplay.style.display = 'block';
+            noteInput.style.display = 'none';
+        } else {
+            // Show input, hide display
+            noteDisplay.style.display = 'none';
+            noteInput.style.display = 'block';
+        }
+
+        // Reset input state
+        textarea.value = '';
+        cancelBtn.style.display = 'none';
+    }
+
+    /**
+     * Load existing notes for current user
+     */
+    async loadTaskNotes() {
+        for (const task of this.tasks) {
+            try {
+                const response = await fetch(`/api/user/${this.currentUser}/task/${task}/note`);
+                if (response.ok) {
+                    const result = await response.json();
+                    this.updateNoteDisplay(task, result.note || '');
+                }
+            } catch (error) {
+                console.error(`Error loading note for task ${task}:`, error);
+            }
         }
     }
 
@@ -739,6 +922,9 @@ class WellnessTracker {
                 }
             }
         });
+
+        // Load notes for current tasks
+        this.loadTaskNotes();
     }
 
     /**

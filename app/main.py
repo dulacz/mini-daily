@@ -26,6 +26,11 @@ class TaskLevelRequest(BaseModel):
     level: int
 
 
+class TaskNoteRequest(BaseModel):
+    task: str
+    note: str
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     # Initialize all users for today
@@ -97,6 +102,40 @@ async def api_user_history(user: str, days: int = 30):
         hist = db.get_history(days=days, user=user)
         user_config = get_user_config(user)
         return {"history": hist, "user_config": user_config, "days": days}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.post("/api/user/{user}/task/note")
+async def set_user_task_note(user: str, request: TaskNoteRequest):
+    """Set note for a task for a specific user"""
+    if user not in USER_CONFIGS:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_tasks = get_user_tasks(user)
+    if request.task not in user_tasks:
+        raise HTTPException(status_code=400, detail="Invalid task for this user")
+
+    try:
+        db.set_task_note(request.task, request.note, user)
+        return {"success": True, "user": user, "task": request.task, "note": request.note}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/api/user/{user}/task/{task}/note")
+async def get_user_task_note(user: str, task: str):
+    """Get note for a task for a specific user"""
+    if user not in USER_CONFIGS:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_tasks = get_user_tasks(user)
+    if task not in user_tasks:
+        raise HTTPException(status_code=400, detail="Invalid task for this user")
+
+    try:
+        note = db.get_task_note(task, user)
+        return {"user": user, "task": task, "note": note}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 

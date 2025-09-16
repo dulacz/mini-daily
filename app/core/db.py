@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS checkin(
     task TEXT NOT NULL,
     level INTEGER NOT NULL DEFAULT 0,
     user TEXT NOT NULL DEFAULT 'alice',
+    note TEXT NOT NULL DEFAULT '',
     UNIQUE(d, task, user)
 )
 """
@@ -43,14 +44,16 @@ def ensure_today_rows(user: str = DEFAULT_USER):
     user_tasks = get_user_tasks(user)
     with get_conn() as conn:
         for task in user_tasks:
-            conn.execute("INSERT OR IGNORE INTO checkin(d,task,level,user) VALUES(?,?,0,?)", (today, task, user))
+            conn.execute(
+                "INSERT OR IGNORE INTO checkin(d,task,level,user,note) VALUES(?,?,0,?,?)", (today, task, user, "")
+            )
 
 
-def get_today_status(user: str = DEFAULT_USER) -> Dict[str, int]:
+def get_today_status(user: str = DEFAULT_USER) -> Dict[str, dict]:
     today = get_pacific_date().isoformat()
     with get_conn() as conn:
-        cur = conn.execute("SELECT task, level FROM checkin WHERE d=? AND user=?", (today, user))
-        return {task: level for task, level in cur.fetchall()}
+        cur = conn.execute("SELECT task, level, note FROM checkin WHERE d=? AND user=?", (today, user))
+        return {task: {"level": level, "note": note} for task, level, note in cur.fetchall()}
 
 
 def set_task_level(task: str, level: int, user: str = DEFAULT_USER):
@@ -59,8 +62,14 @@ def set_task_level(task: str, level: int, user: str = DEFAULT_USER):
     level = max(0, min(3, level))  # Ensure level is between 0-3
 
     with get_conn() as conn:
-        # Insert or update the task level
-        conn.execute("INSERT OR REPLACE INTO checkin(d,task,level,user) VALUES(?,?,?,?)", (today, task, level, user))
+        # First try to update existing row
+        result = conn.execute("UPDATE checkin SET level=? WHERE d=? AND task=? AND user=?", (level, today, task, user))
+
+        # If no rows were updated, insert a new row
+        if result.rowcount == 0:
+            conn.execute(
+                "INSERT INTO checkin(d,task,level,user,note) VALUES(?,?,?,?,?)", (today, task, level, user, "")
+            )
 
 
 def toggle_task(task: str, user: str = DEFAULT_USER):
@@ -70,7 +79,9 @@ def toggle_task(task: str, user: str = DEFAULT_USER):
         cur = conn.execute("SELECT level FROM checkin WHERE d=? AND task=? AND user=?", (today, task, user))
         row = cur.fetchone()
         if not row:
-            conn.execute("INSERT OR IGNORE INTO checkin(d,task,level,user) VALUES(?,?,0,?)", (today, task, user))
+            conn.execute(
+                "INSERT OR IGNORE INTO checkin(d,task,level,user,note) VALUES(?,?,0,?,?)", (today, task, user, "")
+            )
             level = 0
         else:
             level = row[0]
@@ -89,3 +100,22 @@ def get_history(days: int = 30, user: str = DEFAULT_USER):
         for d, task, level in rows:
             grouped.setdefault(d, {})[task] = level
         return grouped
+
+
+def set_task_note(task: str, note: str, user: str = DEFAULT_USER):
+    """Set note for a task on today's date"""
+    today = get_pacific_date().isoformat()
+    with get_conn() as conn:
+        # Ensure row exists for today
+        conn.execute("INSERT OR IGNORE INTO checkin(d,task,level,user,note) VALUES(?,?,0,?,?)", (today, task, user, ""))
+        # Update the note
+        conn.execute("UPDATE checkin SET note=? WHERE d=? AND task=? AND user=?", (note, today, task, user))
+
+
+def get_task_note(task: str, user: str = DEFAULT_USER) -> str:
+    """Get note for a task on today's date"""
+    today = get_pacific_date().isoformat()
+    with get_conn() as conn:
+        cur = conn.execute("SELECT note FROM checkin WHERE d=? AND task=? AND user=?", (today, task, user))
+        row = cur.fetchone()
+        return row[0] if row else ""

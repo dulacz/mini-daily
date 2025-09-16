@@ -479,6 +479,106 @@ body {
     text-align: center;
 }
 
+/* Task Notes */
+.task-note-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.note-display {
+    margin-bottom: 0.5rem;
+}
+
+.note-content {
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.note-input {
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-family: inherit;
+    background: var(--background-color);
+    color: var(--text-primary);
+    resize: vertical;
+    transition: border-color 0.3s ease;
+}
+
+.note-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.note-input::placeholder {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.note-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.note-save-btn,
+.note-cancel-btn,
+.note-edit-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.note-save-btn {
+    background: var(--primary-color);
+    color: white;
+}
+
+.note-save-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+.note-cancel-btn {
+    background: var(--border-color);
+    color: var(--text-secondary);
+}
+
+.note-cancel-btn:hover {
+    background: var(--text-secondary);
+    color: white;
+}
+
+.note-edit-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    font-size: 0.75rem;
+}
+
+.note-edit-btn:hover {
+    background: var(--background-color);
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
 /* Achievement Popup */
 .achievements {
     position: fixed;
