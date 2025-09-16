@@ -1,13 +1,16 @@
 'use strict';
 
 /**
- * Daily Wellness Tracker Application
- * Manages task completion, streaks, and progress tracking
+ * Multi-User Daily Wellness Tracker Application
+ * Manages task completion, streaks, and progress tracking for multiple users
  */
 class WellnessTracker {
     constructor() {
-        this.tasks = []; // Will be loaded from backend
-        this.taskLevels = {}; // Will be loaded from backend
+        this.currentUser = 'alice'; // Default user
+        this.userConfigs = {}; // Will be loaded from backend
+        this.users = []; // Will be loaded from backend
+        this.tasks = []; // Will be loaded for current user
+        this.taskLevels = {}; // Will be loaded for current user
         this.taskData = this.loadData();
         this.achievements = [
             { id: 'first_star', title: 'Getting Started!', message: 'You earned your first star today!', triggered: false },
@@ -25,6 +28,9 @@ class WellnessTracker {
         try {
             // Load configuration from backend first
             await this.loadConfig();
+
+            // Generate user tabs
+            this.generateUserTabs();
 
             await this.checkNewDay();
             this.setupEventListeners();
@@ -45,30 +51,110 @@ class WellnessTracker {
             const response = await fetch('/api/config');
             if (response.ok) {
                 const config = await response.json();
-                this.taskLevels = config.task_levels || {}; // fallback
-                // Derive tasks from task_levels keys
-                this.tasks = Object.keys(this.taskLevels).length > 0 ?
-                    Object.keys(this.taskLevels) :
-                    ['reading', 'exercise', 'caring']; // fallback
-                console.log('Loaded config:', config);
+                this.userConfigs = config.user_configs || {};
+                this.users = config.users || ['alice'];
+                this.currentUser = config.default_user || 'alice';
 
-                // Generate task cards after loading config
-                this.generateTaskCards();
+                // Set current user's tasks and levels
+                await this.setCurrentUser(this.currentUser);
+
+                console.log('Loaded multi-user config:', config);
             } else {
                 throw new Error('Failed to load config');
             }
         } catch (error) {
             console.error('Error loading config, using defaults:', error);
             // Use fallback values if config loading fails
-            this.tasks = ['reading', 'exercise', 'caring'];
-            this.taskLevels = {};
-            this.generateTaskCards(); // Generate with fallback data
+            this.userConfigs = {
+                alice: {
+                    name: 'Alice',
+                    tasks: {
+                        reading: { title: 'Reading', icon: '📚' },
+                        exercise: { title: 'Exercise', icon: '💪' },
+                        caring: { title: 'Self-Care', icon: '❤️' }
+                    }
+                }
+            };
+            this.users = ['alice'];
+            this.currentUser = 'alice';
+            await this.setCurrentUser(this.currentUser);
         }
     }
 
     /**
-     * Generate task cards dynamically from configuration
+     * Set current user and update related data
      */
+    async setCurrentUser(user) {
+        this.currentUser = user;
+        const userConfig = this.userConfigs[user] || this.userConfigs[Object.keys(this.userConfigs)[0]];
+        this.taskLevels = userConfig.tasks || {};
+        this.tasks = Object.keys(this.taskLevels);
+
+        // Update page title
+        const appTitle = document.getElementById('appTitle');
+        if (appTitle) {
+            appTitle.textContent = `${userConfig.name || user}'s Check-in`;
+        }
+
+        // Update CSS custom property for user color
+        if (userConfig.color) {
+            document.documentElement.style.setProperty('--user-color', userConfig.color);
+        }
+
+        // Generate task cards for current user
+        this.generateTaskCards();
+    }
+
+    /**
+     * Generate user tabs dynamically from configuration
+     */
+    generateUserTabs() {
+        const userTabs = document.getElementById('userTabs');
+        if (!userTabs) return;
+
+        userTabs.innerHTML = ''; // Clear existing content
+
+        this.users.forEach(userId => {
+            const userConfig = this.userConfigs[userId];
+            const tabButton = document.createElement('button');
+            tabButton.className = 'user-tab';
+            tabButton.setAttribute('data-user', userId);
+
+            if (userId === this.currentUser) {
+                tabButton.classList.add('active');
+            }
+
+            // Get first task icon as user icon (or use default)
+            const firstTaskIcon = Object.values(userConfig.tasks || {})[0]?.icon || '👤';
+
+            tabButton.innerHTML = `
+                <span class="user-tab-icon">${firstTaskIcon}</span>
+                <span class="user-tab-name">${userConfig.name || userId}</span>
+            `;
+
+            tabButton.addEventListener('click', () => this.switchUser(userId));
+            userTabs.appendChild(tabButton);
+        });
+    }
+
+    /**
+     * Switch to a different user
+     */
+    async switchUser(userId) {
+        if (userId === this.currentUser) return;
+
+        // Update active tab
+        document.querySelectorAll('.user-tab').forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.user === userId);
+        });
+
+        // Switch user and reload data
+        await this.setCurrentUser(userId);
+        this.taskData = this.loadData();
+        await this.checkNewDay();
+        this.updateDisplay();
+        await this.syncWithBackend();
+    }
     generateTaskCards() {
         const tasksContainer = document.getElementById('tasksContainer');
         if (!tasksContainer) return;
@@ -121,11 +207,11 @@ class WellnessTracker {
     }
 
     /**
-     * Sync local data with backend
+     * Sync local data with backend for current user
      */
     async syncWithBackend() {
         try {
-            const response = await fetch('/api/status/today');
+            const response = await fetch(`/api/user/${this.currentUser}/status/today`);
             if (response.ok) {
                 const data = await response.json();
                 const today = this.getDateString();
@@ -156,13 +242,14 @@ class WellnessTracker {
     }
 
     /**
-     * Load data from localStorage
+     * Load data from localStorage for current user
      * @returns {Object} Task data object
      */
     loadData() {
         try {
-            if (typeof Storage !== "undefined" && localStorage.getItem('wellnessData')) {
-                const data = JSON.parse(localStorage.getItem('wellnessData'));
+            const storageKey = `wellnessData_${this.currentUser}`;
+            if (typeof Storage !== "undefined" && localStorage.getItem(storageKey)) {
+                const data = JSON.parse(localStorage.getItem(storageKey));
                 // Ensure data has the right structure
                 if (data && data.currentDate && data.daily && data.streaks) {
                     return data;
@@ -175,18 +262,15 @@ class WellnessTracker {
     }
 
     /**
-     * Get default data structure
+     * Get default data structure for current user
      * @returns {Object} Default task data
      */
     getDefaultData() {
         const today = this.getDateString();
-        return {
+        const defaultData = {
             currentDate: today,
             daily: {
                 [today]: {
-                    reading: 0,
-                    exercise: 0,
-                    caring: 0,
                     completed: []
                 }
             },
@@ -195,15 +279,23 @@ class WellnessTracker {
             },
             achievements: []
         };
+
+        // Initialize tasks for current user
+        this.tasks.forEach(task => {
+            defaultData.daily[today][task] = 0;
+        });
+
+        return defaultData;
     }
 
     /**
-     * Save data to localStorage
+     * Save data to localStorage for current user
      */
     saveData() {
         try {
             if (typeof Storage !== "undefined") {
-                localStorage.setItem('wellnessData', JSON.stringify(this.taskData));
+                const storageKey = `wellnessData_${this.currentUser}`;
+                localStorage.setItem(storageKey, JSON.stringify(this.taskData));
             }
         } catch (error) {
             console.error('Error saving data to localStorage:', error);
@@ -283,8 +375,8 @@ class WellnessTracker {
      */
     async calculateTrueStreak() {
         try {
-            // Fetch historical data from backend
-            const response = await fetch('/api/history?days=365');
+            // Fetch historical data from backend for current user
+            const response = await fetch(`/api/user/${this.currentUser}/history?days=365`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -437,8 +529,8 @@ class WellnessTracker {
         const newLevel = currentLevel === level ? 0 : level;
 
         try {
-            // Call backend API to update database
-            const response = await fetch('/api/task/level', {
+            // Call backend API to update database for current user
+            const response = await fetch(`/api/user/${this.currentUser}/task/level`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -700,7 +792,7 @@ class WellnessTracker {
      */
     async calculateTotalStars365() {
         try {
-            const response = await fetch(`/api/history?days=365`);
+            const response = await fetch(`/api/user/${this.currentUser}/history?days=365`);
             if (!response.ok) {
                 throw new Error('Failed to fetch history data');
             }
@@ -882,8 +974,8 @@ class WellnessTracker {
         weeklyGrid.innerHTML = 'Loading...';
 
         try {
-            // Fetch historical data from backend
-            const response = await fetch('/api/history?days=7');
+            // Fetch historical data from backend for current user
+            const response = await fetch(`/api/user/${this.currentUser}/history?days=7`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -1145,7 +1237,7 @@ class WellnessTracker {
             const totalDays = Math.max(35, daysInMonth + startingDayOfWeek);
 
             // Fetch historical data
-            const response = await fetch(`/api/history?days=${totalDays}`);
+            const response = await fetch(`/api/user/${this.currentUser}/history?days=${totalDays}`);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }

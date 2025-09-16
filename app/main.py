@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -6,7 +6,7 @@ from datetime import date
 from pydantic import BaseModel
 from typing import Dict
 
-from .core.config import TASKS, TASK_LEVELS
+from .core.config import USER_CONFIGS, get_user_config, get_all_users, get_user_tasks, DEFAULT_USER
 from .core import db
 
 app = FastAPI(title="Daily Check-in")
@@ -28,66 +28,109 @@ class TaskLevelRequest(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    db.ensure_today_rows()
-    status = db.get_today_status()
+    # Initialize all users for today
+    for user in get_all_users():
+        db.ensure_today_rows(user)
+
     today = date.today().isoformat()
     return templates.TemplateResponse(
-        "index.html", {"request": request, "today": today, "task_levels": TASK_LEVELS, "status": status}
+        "index.html", {"request": request, "today": today, "user_configs": USER_CONFIGS, "default_user": DEFAULT_USER}
     )
 
 
+# Legacy endpoint for backward compatibility
 @app.get("/toggle/{task}")
 async def toggle(task: str):
     """Legacy endpoint for backward compatibility"""
-    if task not in TASKS:
+    user_tasks = get_user_tasks(DEFAULT_USER)
+    if task not in user_tasks:
         return RedirectResponse("/", status_code=302)
-    db.toggle_task(task)
+    db.toggle_task(task, DEFAULT_USER)
     return RedirectResponse("/", status_code=302)
 
 
-@app.post("/api/task/level")
-async def set_task_level(request: TaskLevelRequest):
-    """Set task completion level (0-3 stars)"""
-    if request.task not in TASKS:
-        return JSONResponse(status_code=400, content={"error": "Invalid task"})
+# New user-specific API endpoints
+@app.post("/api/user/{user}/task/level")
+async def set_user_task_level(user: str, request: TaskLevelRequest):
+    """Set task completion level (0-3 stars) for a specific user"""
+    if user not in USER_CONFIGS:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_tasks = get_user_tasks(user)
+    if request.task not in user_tasks:
+        raise HTTPException(status_code=400, detail="Invalid task for this user")
 
     if not (0 <= request.level <= 3):
-        return JSONResponse(status_code=400, content={"error": "Level must be between 0 and 3"})
+        raise HTTPException(status_code=400, detail="Level must be between 0 and 3")
 
     try:
-        db.set_task_level(request.task, request.level)
-        db.ensure_today_rows()
-        status = db.get_today_status()
-        return {"success": True, "task": request.task, "level": request.level, "status": status}
+        db.set_task_level(request.task, request.level, user)
+        db.ensure_today_rows(user)
+        status = db.get_today_status(user)
+        return {"success": True, "user": user, "task": request.task, "level": request.level, "status": status}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": f"Database error: {str(e)}"})
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/api/user/{user}/status/today")
+async def api_user_today(user: str):
+    """Get today's completion status for a specific user"""
+    if user not in USER_CONFIGS:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        db.ensure_today_rows(user)
+        status = db.get_today_status(user)
+        user_config = get_user_config(user)
+        return {"date": date.today().isoformat(), "status": status, "user_config": user_config}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@app.get("/api/user/{user}/history")
+async def api_user_history(user: str, days: int = 30):
+    """Get completion history for a specific user"""
+    if user not in USER_CONFIGS:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        hist = db.get_history(days=days, user=user)
+        user_config = get_user_config(user)
+        return {"history": hist, "user_config": user_config, "days": days}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+# Legacy API endpoints for backward compatibility
+@app.post("/api/task/level")
+async def set_task_level(request: TaskLevelRequest):
+    """Legacy endpoint - uses default user"""
+    return await set_user_task_level(DEFAULT_USER, request)
 
 
 @app.get("/api/status/today")
 async def api_today():
-    """Get today's completion status"""
-    try:
-        db.ensure_today_rows()
-        status = db.get_today_status()
-        return {"date": date.today().isoformat(), "status": status, "task_levels": TASK_LEVELS}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": f"Database error: {str(e)}"})
+    """Legacy endpoint - uses default user"""
+    return await api_user_today(DEFAULT_USER)
 
 
 @app.get("/api/history")
 async def api_history(days: int = 30):
-    """Get completion history"""
-    try:
-        hist = db.get_history(days=days)
-        return {"history": hist, "task_levels": TASK_LEVELS, "days": days}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": f"Database error: {str(e)}"})
+    """Legacy endpoint - uses default user"""
+    return await api_user_history(DEFAULT_USER, days)
 
 
+# Configuration endpoints
 @app.get("/api/config")
 async def api_config():
     """Get application configuration"""
-    return {"task_levels": TASK_LEVELS}
+    return {"user_configs": USER_CONFIGS, "users": get_all_users(), "default_user": DEFAULT_USER}
+
+
+@app.get("/api/users")
+async def api_users():
+    """Get list of all users"""
+    return {"users": get_all_users(), "user_configs": USER_CONFIGS}
 
 
 @app.get("/.well-known/appspecific/com.chrome.devtools.json")

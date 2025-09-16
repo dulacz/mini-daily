@@ -1,6 +1,6 @@
 import sqlite3
 from pathlib import Path
-from .config import DB_PATH, TASKS
+from .config import DB_PATH, get_user_tasks, DEFAULT_USER
 from datetime import date, datetime, timedelta
 import pytz
 from typing import Dict
@@ -22,14 +22,9 @@ CREATE TABLE IF NOT EXISTS checkin(
     d TEXT NOT NULL,
     task TEXT NOT NULL,
     level INTEGER NOT NULL DEFAULT 0,
-    UNIQUE(d, task)
+    user TEXT NOT NULL DEFAULT 'alice',
+    UNIQUE(d, task, user)
 )
-"""
-
-# Migration DDL to update existing databases
-MIGRATION_DDL = """
-ALTER TABLE checkin ADD COLUMN level INTEGER DEFAULT 0;
-UPDATE checkin SET level = done WHERE level = 0;
 """
 
 
@@ -39,95 +34,58 @@ def get_conn():
 
 def init_db():
     with get_conn() as conn:
-        # Create table
+        # Create table with new schema
         conn.execute(DDL)
 
-        # Try to migrate existing data
-        try:
-            # Check if level column exists
-            cursor = conn.execute("PRAGMA table_info(checkin)")
-            columns = [column[1] for column in cursor.fetchall()]
-            if "level" not in columns:
-                # Add level column and migrate data
-                conn.execute("ALTER TABLE checkin ADD COLUMN level INTEGER DEFAULT 0")
-                conn.execute("UPDATE checkin SET level = done WHERE level = 0")
-        except sqlite3.Error as e:
-            print(f"Migration note: {e}")
+
+def ensure_today_rows(user: str = DEFAULT_USER):
+    today = get_pacific_date().isoformat()
+    user_tasks = get_user_tasks(user)
+    with get_conn() as conn:
+        for task in user_tasks:
+            conn.execute("INSERT OR IGNORE INTO checkin(d,task,level,user) VALUES(?,?,0,?)", (today, task, user))
 
 
-def ensure_today_rows():
+def get_today_status(user: str = DEFAULT_USER) -> Dict[str, int]:
     today = get_pacific_date().isoformat()
     with get_conn() as conn:
-        for t in TASKS:
-            conn.execute("INSERT OR IGNORE INTO checkin(d,task,level) VALUES(?,?,0)", (today, t))
+        cur = conn.execute("SELECT task, level FROM checkin WHERE d=? AND user=?", (today, user))
+        return {task: level for task, level in cur.fetchall()}
 
 
-def get_today_status() -> Dict[str, int]:
-    today = get_pacific_date().isoformat()
-    with get_conn() as conn:
-        # Try new column first, fallback to old column for compatibility
-        try:
-            cur = conn.execute("SELECT task, level FROM checkin WHERE d=?", (today,))
-            return {task: level for task, level in cur.fetchall()}
-        except sqlite3.OperationalError:
-            # Fallback to old 'done' column
-            cur = conn.execute("SELECT task, done FROM checkin WHERE d=?", (today,))
-            return {task: (1 if done else 0) for task, done in cur.fetchall()}
-
-
-def set_task_level(task: str, level: int):
-    """Set task completion level (0-3)"""
+def set_task_level(task: str, level: int, user: str = DEFAULT_USER):
+    """Set task completion level (0-3) for a specific user"""
     today = get_pacific_date().isoformat()
     level = max(0, min(3, level))  # Ensure level is between 0-3
 
     with get_conn() as conn:
         # Insert or update the task level
-        conn.execute("INSERT OR REPLACE INTO checkin(d,task,level) VALUES(?,?,?)", (today, task, level))
+        conn.execute("INSERT OR REPLACE INTO checkin(d,task,level,user) VALUES(?,?,?,?)", (today, task, level, user))
 
 
-def toggle_task(task: str):
+def toggle_task(task: str, user: str = DEFAULT_USER):
     """Legacy function for backward compatibility - toggles between 0 and 1"""
     today = get_pacific_date().isoformat()
     with get_conn() as conn:
-        try:
-            cur = conn.execute("SELECT level FROM checkin WHERE d=? AND task=?", (today, task))
-            row = cur.fetchone()
-            if not row:
-                conn.execute("INSERT OR IGNORE INTO checkin(d,task,level) VALUES(?,?,0)", (today, task))
-                level = 0
-            else:
-                level = row[0]
-            new_val = 0 if level else 1
-            conn.execute("UPDATE checkin SET level=? WHERE d=? AND task=?", (new_val, today, task))
-        except sqlite3.OperationalError:
-            # Fallback to old 'done' column
-            cur = conn.execute("SELECT done FROM checkin WHERE d=? AND task=?", (today, task))
-            row = cur.fetchone()
-            if not row:
-                conn.execute("INSERT OR IGNORE INTO checkin(d,task,done) VALUES(?,?,0)", (today, task))
-                done = 0
-            else:
-                done = row[0]
-            new_val = 0 if done else 1
-            conn.execute("UPDATE checkin SET done=? WHERE d=? AND task=?", (new_val, today, task))
+        cur = conn.execute("SELECT level FROM checkin WHERE d=? AND task=? AND user=?", (today, task, user))
+        row = cur.fetchone()
+        if not row:
+            conn.execute("INSERT OR IGNORE INTO checkin(d,task,level,user) VALUES(?,?,0,?)", (today, task, user))
+            level = 0
+        else:
+            level = row[0]
+        new_val = 0 if level else 1
+        conn.execute("UPDATE checkin SET level=? WHERE d=? AND task=? AND user=?", (new_val, today, task, user))
 
 
-def get_history(days: int = 30):
+def get_history(days: int = 30, user: str = DEFAULT_USER):
     cutoff = (get_pacific_date() - timedelta(days=days - 1)).isoformat()
     with get_conn() as conn:
-        try:
-            # Try new schema first
-            cur = conn.execute("SELECT d, task, level FROM checkin WHERE d >= ? ORDER BY d DESC, task", (cutoff,))
-            rows = cur.fetchall()
-            grouped = {}
-            for d, task, level in rows:
-                grouped.setdefault(d, {})[task] = level
-            return grouped
-        except sqlite3.OperationalError:
-            # Fallback to old schema
-            cur = conn.execute("SELECT d, task, done FROM checkin WHERE d >= ? ORDER BY d DESC, task", (cutoff,))
-            rows = cur.fetchall()
-            grouped = {}
-            for d, task, done in rows:
-                grouped.setdefault(d, {})[task] = done
-            return grouped
+        cur = conn.execute(
+            "SELECT d, task, level FROM checkin WHERE d >= ? AND user = ? ORDER BY d DESC, task", (cutoff, user)
+        )
+        rows = cur.fetchall()
+        grouped = {}
+        for d, task, level in rows:
+            grouped.setdefault(d, {})[task] = level
+        return grouped
