@@ -26,8 +26,14 @@ class WellnessTracker {
      */
     async init() {
         try {
+            // Initialize theme from localStorage
+            this.initializeTheme();
+
             // Load configuration from backend first
             await this.loadConfig();
+
+            // Set initial user background
+            this.updateUserBackground();
 
             // Generate user tabs
             this.generateUserTabs();
@@ -35,6 +41,9 @@ class WellnessTracker {
             await this.checkNewDay();
             this.setupEventListeners();
             this.updateDisplay();
+
+            // Create animated background particles
+            this.createParticles();
 
             // Sync with backend on startup
             await this.syncWithBackend();
@@ -147,6 +156,9 @@ class WellnessTracker {
         document.querySelectorAll('.user-tab').forEach(tab => {
             tab.classList.toggle('active', tab.dataset.user === userId);
         });
+
+        // Update background gradient for new user
+        this.updateUserBackground(userId);
 
         // Switch user and reload data
         await this.setCurrentUser(userId);
@@ -512,6 +524,12 @@ class WellnessTracker {
         const monthlySummaryToggle = document.getElementById('monthlySummaryToggle');
         if (monthlySummaryToggle) {
             monthlySummaryToggle.addEventListener('click', () => this.toggleMonthlySummary());
+        }
+
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => this.toggleTheme());
         }
 
         // Achievement popup close (click anywhere)
@@ -1546,6 +1564,96 @@ class WellnessTracker {
         } catch (error) {
             console.error('Error loading monthly data:', error);
             monthlyGrid.innerHTML = 'Error loading monthly data';
+        }
+    }
+
+    /**
+     * Create animated background particles
+     */
+    createParticles() {
+        try {
+            const particlesContainer = document.getElementById('particles');
+            if (!particlesContainer) return;
+
+            const particleCount = 50;
+            // Ensure particles stay invisible for at least the first BASE_DELAY seconds
+            const BASE_DELAY_SECONDS = 0; // minimum time particles are hidden after initial page load
+            const EXTRA_RANDOM_DELAY = 8; // additional random delay spread to avoid a wave effect
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                // Start each particle after the base invisible period plus a random extra delay
+                particle.style.animationDelay = (BASE_DELAY_SECONDS + Math.random() * EXTRA_RANDOM_DELAY) + 's';
+                particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+                particlesContainer.appendChild(particle);
+            }
+        } catch (error) {
+            console.error('Error creating particles:', error);
+        }
+    }
+
+    /**
+     * Toggle between light and dark theme
+     */
+    toggleTheme() {
+        try {
+            const body = document.body;
+            const themeToggle = document.getElementById('themeToggle');
+
+            if (body.classList.contains('dark-theme')) {
+                body.classList.remove('dark-theme');
+                themeToggle.textContent = '🌙';
+                localStorage.setItem('theme', 'light');
+            } else {
+                body.classList.add('dark-theme');
+                themeToggle.textContent = '☀️';
+                localStorage.setItem('theme', 'dark');
+            }
+        } catch (error) {
+            console.error('Error toggling theme:', error);
+        }
+    }
+
+    /**
+     * Initialize theme from localStorage
+     */
+    initializeTheme() {
+        try {
+            const savedTheme = localStorage.getItem('theme');
+            const body = document.body;
+            const themeToggle = document.getElementById('themeToggle');
+
+            if (savedTheme === 'dark') {
+                body.classList.add('dark-theme');
+                if (themeToggle) themeToggle.textContent = '☀️';
+            } else {
+                body.classList.remove('dark-theme');
+                if (themeToggle) themeToggle.textContent = '🌙';
+            }
+        } catch (error) {
+            console.error('Error initializing theme:', error);
+        }
+    }
+
+    /**
+     * Update background gradient based on current user
+     */
+    updateUserBackground(userId = null) {
+        try {
+            const body = document.body;
+            const currentUserId = userId || this.currentUser;
+
+            // Remove all existing user classes
+            body.classList.remove('user-alice', 'user-bob', 'user-carol');
+
+            // Add the current user's class
+            if (currentUserId) {
+                body.classList.add(`user-${currentUserId}`);
+            }
+        } catch (error) {
+            console.error('Error updating user background:', error);
         }
     }
 }
