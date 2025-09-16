@@ -98,6 +98,7 @@ body {
 }
 
 @keyframes flicker {
+
     0%,
     50% {
         opacity: 1;
@@ -437,6 +438,7 @@ body {
 }
 
 @keyframes bounce {
+
     0%,
     20%,
     50%,

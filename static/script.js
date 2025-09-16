@@ -20,13 +20,51 @@ class WellnessTracker {
     /**
      * Initialize the application
      */
-    init() {
+    async init() {
         try {
             this.checkNewDay();
             this.setupEventListeners();
             this.updateDisplay();
+
+            // Sync with backend on startup
+            await this.syncWithBackend();
         } catch (error) {
             console.error('Error initializing WellnessTracker:', error);
+        }
+    }
+
+    /**
+     * Sync local data with backend
+     */
+    async syncWithBackend() {
+        try {
+            const response = await fetch('/api/status/today');
+            if (response.ok) {
+                const data = await response.json();
+                const today = this.getDateString();
+
+                // Update today's data with backend data
+                if (data.status) {
+                    this.taskData.daily[today] = {
+                        ...this.taskData.daily[today],
+                        ...data.status,
+                        completed: []
+                    };
+
+                    // Rebuild completed array based on levels
+                    Object.keys(data.status).forEach(task => {
+                        if (data.status[task] > 0) {
+                            this.taskData.daily[today].completed.push(task);
+                        }
+                    });
+
+                    this.saveData();
+                    this.updateDisplay();
+                }
+            }
+        } catch (error) {
+            console.error('Error syncing with backend:', error);
+            // Continue with local data if backend is unavailable
         }
     }
 
@@ -89,11 +127,32 @@ class WellnessTracker {
     }
 
     /**
-     * Get today's date as string
+     * Get today's date as string in Pacific Time
      * @returns {string} Date string in YYYY-MM-DD format
      */
     getDateString(date = new Date()) {
-        return date.toISOString().split('T')[0];
+        // Get the date string directly in Pacific Time
+        const pacificDateParts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Los_Angeles',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).formatToParts(date);
+
+        const year = pacificDateParts.find(part => part.type === 'year').value;
+        const month = pacificDateParts.find(part => part.type === 'month').value;
+        const day = pacificDateParts.find(part => part.type === 'day').value;
+
+        return `${year}-${month}-${day}`;
+    }
+
+    /**
+     * Get current date in Pacific Time
+     * @returns {Date} Date object representing current time in Pacific Time
+     */
+    getPacificDate() {
+        const now = new Date();
+        return new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
     }
 
     /**
@@ -195,32 +254,77 @@ class WellnessTracker {
      * @param {string} task - Task name
      * @param {number} level - Completion level (1-3)
      */
-    setTaskLevel(task, level) {
+    async setTaskLevel(task, level) {
         const today = this.getDateString();
         const currentLevel = this.taskData.daily[today][task];
 
         // Toggle behavior: if clicking the same level, set to 0, otherwise set to clicked level
         const newLevel = currentLevel === level ? 0 : level;
 
-        this.taskData.daily[today][task] = newLevel;
+        try {
+            // Call backend API to update database
+            const response = await fetch('/api/task/level', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    task: task,
+                    level: newLevel
+                })
+            });
 
-        // Update completed tasks array
-        const completedTasks = this.taskData.daily[today].completed;
-        if (newLevel > 0 && !completedTasks.includes(task)) {
-            completedTasks.push(task);
-        } else if (newLevel === 0 && completedTasks.includes(task)) {
-            const index = completedTasks.indexOf(task);
-            if (index > -1) {
-                completedTasks.splice(index, 1);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Update local data with server response
+                this.taskData.daily[today][task] = newLevel;
+
+                // Update completed tasks array
+                const completedTasks = this.taskData.daily[today].completed;
+                if (newLevel > 0 && !completedTasks.includes(task)) {
+                    completedTasks.push(task);
+                } else if (newLevel === 0 && completedTasks.includes(task)) {
+                    const index = completedTasks.indexOf(task);
+                    if (index > -1) {
+                        completedTasks.splice(index, 1);
+                    }
+                }
+
+                this.saveData();
+                this.updateDisplay();
+                this.checkAchievements();
+
+                // Add visual feedback
+                this.addCompletionFeedback(task, newLevel);
+            } else {
+                console.error('Failed to update task level:', result.error);
+                // Optionally show user-friendly error message
+            }
+        } catch (error) {
+            console.error('Error updating task level:', error);
+            // Fallback to local storage only
+            this.taskData.daily[today][task] = newLevel;
+
+            const completedTasks = this.taskData.daily[today].completed;
+            if (newLevel > 0 && !completedTasks.includes(task)) {
+                completedTasks.push(task);
+            } else if (newLevel === 0 && completedTasks.includes(task)) {
+                const index = completedTasks.indexOf(task);
+                if (index > -1) {
+                    completedTasks.splice(index, 1);
+                }
+            }
+
+            this.saveData();
+            this.updateDisplay();
+            this.checkAchievements();
+            this.addCompletionFeedback(task, newLevel);
         }
-
-        this.saveData();
-        this.updateDisplay();
-        this.checkAchievements();
-
-        // Add visual feedback
-        this.addCompletionFeedback(task, newLevel);
     }
 
     /**
@@ -266,12 +370,13 @@ class WellnessTracker {
     updateDateDisplay() {
         const dateElement = document.getElementById('dateDisplay');
         if (dateElement) {
-            const today = new Date();
-            const options = { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+            const today = this.getPacificDate();
+            const options = {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                timeZone: 'America/Los_Angeles'
             };
             dateElement.textContent = today.toLocaleDateString('en-US', options);
         }
@@ -334,7 +439,7 @@ class WellnessTracker {
             const taskCard = document.querySelector(`[data-task="${task}"]`);
             const badge = document.getElementById(`${task}Badge`);
             const streakCount = document.getElementById(`${task}Streak`);
-            
+
             if (taskCard) {
                 // Update star buttons
                 const starBtns = taskCard.querySelectorAll('.star-btn');
@@ -442,7 +547,7 @@ class WellnessTracker {
         if (achievementSection && achievementTitle && achievementMessage) {
             achievementTitle.textContent = achievement.title;
             achievementMessage.textContent = achievement.message;
-            
+
             achievementSection.style.display = 'flex';
             achievementSection.classList.add('show');
 
@@ -475,7 +580,7 @@ class WellnessTracker {
 
         if (summaryContent && summaryToggle) {
             const isVisible = summaryContent.style.display !== 'none';
-            
+
             if (isVisible) {
                 summaryContent.style.display = 'none';
                 summaryToggle.classList.remove('active');
@@ -497,29 +602,154 @@ class WellnessTracker {
     /**
      * Render weekly progress grid
      */
-    renderWeeklyGrid() {
+    async renderWeeklyGrid() {
+        const weeklyGrid = document.getElementById('weeklyGrid');
+        if (!weeklyGrid) return;
+
+        weeklyGrid.innerHTML = 'Loading...';
+
+        try {
+            // Fetch historical data from backend
+            const response = await fetch('/api/history?days=7');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const history = data.history;
+
+            weeklyGrid.innerHTML = '';
+
+            // Get Monday to Sunday of current week in Pacific Time
+            const today = this.getPacificDate();
+            const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+            const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay; // Calculate days to Monday
+
+            const monday = new Date(today);
+            monday.setDate(today.getDate() + mondayOffset);
+
+            const weekDays = [];
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(monday);
+                date.setDate(monday.getDate() + i);
+                weekDays.push(date);
+            }
+
+            weekDays.forEach(date => {
+                const dateStr = this.getDateString(date);
+                const dayData = history[dateStr];
+
+                const dayCell = document.createElement('div');
+                dayCell.className = 'day-cell';
+
+                const dayLabel = document.createElement('div');
+                dayLabel.textContent = date.toLocaleDateString('en-US', { weekday: 'short' });
+                dayCell.appendChild(dayLabel);
+
+                const dateLabel = document.createElement('div');
+                dateLabel.textContent = date.getDate();
+                dayCell.appendChild(dateLabel);
+
+                if (dayData) {
+                    // Count total stars from the database
+                    const totalStars = Object.values(dayData).reduce((sum, val) => {
+                        return sum + (typeof val === 'number' ? val : 0);
+                    }, 0);
+
+                    // Count completed tasks (tasks with level > 0)
+                    const completedTasks = Object.values(dayData).filter(val =>
+                        typeof val === 'number' && val > 0
+                    ).length;
+
+                    if (completedTasks === 3) {
+                        dayCell.classList.add('completed');
+                    } else if (totalStars > 0) {
+                        dayCell.classList.add('partial');
+                    }
+
+                    // Always show stars if there are any, make them more prominent
+                    if (totalStars > 0) {
+                        const starsLabel = document.createElement('div');
+                        // Create multiple rows with max 3 stars per row
+                        const starsPerRow = 3;
+                        const rows = [];
+                        for (let i = 0; i < totalStars; i += starsPerRow) {
+                            const starsInRow = Math.min(starsPerRow, totalStars - i);
+                            rows.push('⭐'.repeat(starsInRow));
+                        }
+                        starsLabel.innerHTML = rows.join('<br>');
+                        starsLabel.style.fontSize = '0.7rem';
+                        starsLabel.style.fontWeight = 'bold';
+                        starsLabel.style.color = '#f59e0b';
+                        starsLabel.style.marginTop = '2px';
+                        starsLabel.style.textShadow = '0 1px 2px rgba(0,0,0,0.1)';
+                        starsLabel.style.lineHeight = '1.1';
+                        starsLabel.style.textAlign = 'center';
+                        dayCell.appendChild(starsLabel);
+                    } else {
+                        // Show empty state for days with data but no completion
+                        const starsLabel = document.createElement('div');
+                        starsLabel.textContent = '-';
+                        starsLabel.style.fontSize = '0.7rem';
+                        starsLabel.style.color = '#9ca3af';
+                        starsLabel.style.marginTop = '2px';
+                        dayCell.appendChild(starsLabel);
+                    }
+
+                    console.log(`Day ${dateStr}: ${totalStars} stars, ${completedTasks} completed tasks`);
+                } else {
+                    // Show empty state for days without data
+                    const emptyLabel = document.createElement('div');
+                    emptyLabel.textContent = '-';
+                    emptyLabel.style.fontSize = '0.7rem';
+                    emptyLabel.style.color = '#9ca3af';
+                    emptyLabel.style.marginTop = '2px';
+                    dayCell.appendChild(emptyLabel);
+                } weeklyGrid.appendChild(dayCell);
+            });
+
+        } catch (error) {
+            console.error('Error loading weekly data:', error);
+            weeklyGrid.innerHTML = 'Error loading weekly data';
+
+            // Fallback to local storage data
+            setTimeout(() => {
+                this.renderWeeklyGridFromLocal();
+            }, 1000);
+        }
+    }
+
+    /**
+     * Fallback method to render weekly grid from local storage
+     */
+    renderWeeklyGridFromLocal() {
         const weeklyGrid = document.getElementById('weeklyGrid');
         if (!weeklyGrid) return;
 
         weeklyGrid.innerHTML = '';
 
-        // Get last 7 days
-        const today = new Date();
-        const days = [];
-        
-        for (let i = 6; i >= 0; i--) {
-            const date = new Date(today);
-            date.setDate(date.getDate() - i);
-            days.push(date);
+        // Get Monday to Sunday of current week in Pacific Time
+        const today = this.getPacificDate();
+        const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
+
+        const monday = new Date(today);
+        monday.setDate(today.getDate() + mondayOffset);
+
+        const weekDays = [];
+        for (let i = 0; i < 7; i++) {
+            const date = new Date(monday);
+            date.setDate(monday.getDate() + i);
+            weekDays.push(date);
         }
 
-        days.forEach(date => {
+        weekDays.forEach(date => {
             const dateStr = this.getDateString(date);
             const dayData = this.taskData.daily[dateStr];
-            
+
             const dayCell = document.createElement('div');
             dayCell.className = 'day-cell';
-            
+
             const dayLabel = document.createElement('div');
             dayLabel.textContent = date.toLocaleDateString('en-US', { weekday: 'short' });
             dayCell.appendChild(dayLabel);
@@ -540,10 +770,44 @@ class WellnessTracker {
                     dayCell.classList.add('partial');
                 }
 
-                const starsLabel = document.createElement('div');
-                starsLabel.textContent = `${totalStars}⭐`;
-                starsLabel.style.fontSize = '0.6rem';
-                dayCell.appendChild(starsLabel);
+                // Always show stars if there are any, make them more prominent
+                if (totalStars > 0) {
+                    const starsLabel = document.createElement('div');
+                    // Create multiple rows with max 3 stars per row
+                    const starsPerRow = 3;
+                    const rows = [];
+                    for (let i = 0; i < totalStars; i += starsPerRow) {
+                        const starsInRow = Math.min(starsPerRow, totalStars - i);
+                        rows.push('⭐'.repeat(starsInRow));
+                    }
+                    starsLabel.innerHTML = rows.join('<br>');
+                    starsLabel.style.fontSize = '0.7rem';
+                    starsLabel.style.fontWeight = 'bold';
+                    starsLabel.style.color = '#f59e0b';
+                    starsLabel.style.marginTop = '2px';
+                    starsLabel.style.textShadow = '0 1px 2px rgba(0,0,0,0.1)';
+                    starsLabel.style.lineHeight = '1.1';
+                    starsLabel.style.textAlign = 'center';
+                    dayCell.appendChild(starsLabel);
+                } else {
+                    // Show empty state for days with data but no completion
+                    const starsLabel = document.createElement('div');
+                    starsLabel.textContent = '-';
+                    starsLabel.style.fontSize = '0.7rem';
+                    starsLabel.style.color = '#9ca3af';
+                    starsLabel.style.marginTop = '2px';
+                    dayCell.appendChild(starsLabel);
+                }
+
+                console.log(`Day ${dateStr} (local): ${totalStars} stars, ${completedTasks} completed tasks`);
+            } else {
+                // Show empty state for days without data
+                const emptyLabel = document.createElement('div');
+                emptyLabel.textContent = '-';
+                emptyLabel.style.fontSize = '0.7rem';
+                emptyLabel.style.color = '#9ca3af';
+                emptyLabel.style.marginTop = '2px';
+                dayCell.appendChild(emptyLabel);
             }
 
             weeklyGrid.appendChild(dayCell);
