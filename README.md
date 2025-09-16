@@ -1,6 +1,6 @@
 # Local Daily Check-in (FastAPI)
 
-A tiny web app (3 fixed daily goals) for personal use on your home LAN (WiFi). No auth, no cloud, single SQLite file. Access from phone or computer browser pointing to the same machine.
+A lightweight web app to track daily check-in. No auth, no cloud, single SQLite file. Access from phone or computer browser pointing to the same machine.
 
 ## Quick Start
 ```powershell
