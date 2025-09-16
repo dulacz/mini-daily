@@ -388,6 +388,12 @@ class WellnessTracker {
             summaryToggle.addEventListener('click', () => this.toggleWeeklySummary());
         }
 
+        // Monthly summary toggle
+        const monthlySummaryToggle = document.getElementById('monthlySummaryToggle');
+        if (monthlySummaryToggle) {
+            monthlySummaryToggle.addEventListener('click', () => this.toggleMonthlySummary());
+        }
+
         // Achievement popup close (click anywhere)
         document.addEventListener('click', (e) => {
             if (e.target.closest('.achievements')) {
@@ -530,6 +536,7 @@ class WellnessTracker {
         this.updateStats();
         this.updateTaskCards();
         await this.updateStreakDisplay();
+        await this.updateStarDisplay();
         this.updateWeeklySummary();
     }
 
@@ -655,6 +662,17 @@ class WellnessTracker {
     }
 
     /**
+     * Update star counter display (365 days)
+     */
+    async updateStarDisplay() {
+        const starCount = document.getElementById('starCount');
+        if (starCount) {
+            const totalStars = await this.calculateTotalStars365();
+            starCount.textContent = totalStars;
+        }
+    }
+
+    /**
      * Calculate current streak including today's potential using recursive method
      */
     async calculateCurrentStreak() {
@@ -675,6 +693,75 @@ class WellnessTracker {
         }
 
         return currentStreak;
+    }
+
+    /**
+     * Calculate total stars within 365 days using backend API
+     */
+    async calculateTotalStars365() {
+        try {
+            const response = await fetch(`/api/history?days=365`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch history data');
+            }
+
+            const data = await response.json();
+            const history = data.history;
+            let totalStars = 0;
+
+            // Calculate total stars from backend data
+            // Iterate over all dates in the history object
+            for (const dateStr in history) {
+                const dayData = history[dateStr];
+                // dayData is an object like {caring: 3, exercise: 1, reading: 3}
+                // Sum all task levels for this date
+                for (const task in dayData) {
+                    if (typeof dayData[task] === 'number') {
+                        totalStars += dayData[task];
+                    }
+                }
+            }
+
+            // Add today's stars from local data
+            const today = this.getDateString();
+            const todayData = this.taskData.daily[today];
+            const todayStars = Object.values(todayData).reduce((sum, val) => {
+                return sum + (typeof val === 'number' ? val : 0);
+            }, 0);
+            totalStars += todayStars;
+
+            return totalStars;
+        } catch (error) {
+            console.error('Error calculating 365-day star total:', error);
+            // Fallback to local calculation if backend fails
+            return this.calculateTotalStarsLocal365();
+        }
+    }
+
+    /**
+     * Fallback method to calculate total stars from local storage (limited data)
+     */
+    calculateTotalStarsLocal365() {
+        let totalStars = 0;
+        const today = new Date();
+
+        // Calculate for the last 365 days using available local data
+        for (let i = 0; i < 365; i++) {
+            const checkDate = new Date(today);
+            checkDate.setDate(checkDate.getDate() - i);
+            const dateStr = this.getDateString(checkDate);
+
+            const dayData = this.taskData.daily[dateStr];
+            if (dayData) {
+                Object.values(dayData).forEach(val => {
+                    if (typeof val === 'number') {
+                        totalStars += val;
+                    }
+                });
+            }
+        }
+
+        return totalStars;
     }
 
     /**
@@ -998,6 +1085,190 @@ class WellnessTracker {
 
             weeklyGrid.appendChild(dayCell);
         });
+    }
+
+    /**
+     * Toggle monthly summary display
+     */
+    toggleMonthlySummary() {
+        const summaryContent = document.getElementById('monthlySummaryContent');
+        const summaryToggle = document.getElementById('monthlySummaryToggle');
+
+        if (summaryContent && summaryToggle) {
+            const isVisible = summaryContent.style.display !== 'none';
+
+            if (isVisible) {
+                summaryContent.style.display = 'none';
+                summaryToggle.classList.remove('active');
+            } else {
+                summaryContent.style.display = 'block';
+                summaryToggle.classList.add('active');
+                this.renderMonthlyGrid();
+            }
+        }
+    }
+
+    /**
+     * Render monthly progress grid
+     */
+    async renderMonthlyGrid() {
+        const monthlyGrid = document.getElementById('monthlyGrid');
+        const monthlyTitle = document.getElementById('monthlyTitle');
+        if (!monthlyGrid) return;
+
+        monthlyGrid.innerHTML = 'Loading...';
+
+        try {
+            // Get current month info
+            const today = this.getPacificDate();
+            const currentMonth = today.getMonth();
+            const currentYear = today.getFullYear();
+            const todayDateStr = this.getDateString();
+
+            // Update title
+            const monthName = today.toLocaleDateString('en-US', {
+                month: 'long',
+                year: 'numeric',
+                timeZone: 'America/Los_Angeles'
+            });
+            if (monthlyTitle) {
+                monthlyTitle.textContent = `${monthName} Progress`;
+            }
+
+            // Get first day of month and determine starting day of week
+            const firstDay = new Date(currentYear, currentMonth, 1);
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            const daysInMonth = lastDay.getDate();
+            const startingDayOfWeek = firstDay.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+            // Calculate how many days to fetch (including some before/after for context)
+            const totalDays = Math.max(35, daysInMonth + startingDayOfWeek);
+
+            // Fetch historical data
+            const response = await fetch(`/api/history?days=${totalDays}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const history = data.history;
+
+            monthlyGrid.innerHTML = '';
+
+            // Create a container for the entire monthly view
+            const monthlyContainer = document.createElement('div');
+
+            // Add day headers (Sun, Mon, Tue, etc.)
+            const dayHeaders = document.createElement('div');
+            dayHeaders.className = 'month-header';
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            dayNames.forEach(dayName => {
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'day-header';
+                dayHeader.textContent = dayName;
+                dayHeaders.appendChild(dayHeader);
+            });
+            monthlyContainer.appendChild(dayHeaders);
+
+            // Create the monthly grid container
+            const gridContainer = document.createElement('div');
+            gridContainer.style.display = 'grid';
+            gridContainer.style.gridTemplateColumns = 'repeat(7, 1fr)';
+            gridContainer.style.gap = '0.5rem';
+
+            const totalCells = Math.ceil((daysInMonth + startingDayOfWeek) / 7) * 7;
+
+            for (let i = 0; i < totalCells; i++) {
+                const dayCell = document.createElement('div');
+                dayCell.className = 'day-cell';
+
+                const dayNumber = i - startingDayOfWeek + 1;
+
+                if (dayNumber <= 0 || dayNumber > daysInMonth) {
+                    // Outside current month - empty cell
+                    dayCell.classList.add('outside-month');
+                } else {
+                    // Valid day in current month
+                    const date = new Date(currentYear, currentMonth, dayNumber);
+                    const dateStr = this.getDateString(date);
+
+                    // Add day number
+                    const dayLabel = document.createElement('div');
+                    dayLabel.textContent = dayNumber;
+                    dayLabel.style.fontWeight = 'bold';
+                    dayCell.appendChild(dayLabel);
+
+                    // Check if this is today
+                    if (dateStr === todayDateStr) {
+                        dayCell.classList.add('today');
+                    }
+
+                    const dayData = history[dateStr];
+
+                    if (dayData) {
+                        // Count total stars and completed tasks
+                        const totalStars = Object.values(dayData).reduce((sum, val) => {
+                            return sum + (typeof val === 'number' ? val : 0);
+                        }, 0);
+
+                        const completedTasks = Object.values(dayData).filter(val =>
+                            typeof val === 'number' && val > 0
+                        ).length;
+
+                        if (completedTasks === 3) {
+                            dayCell.classList.add('completed');
+                        } else if (totalStars > 0) {
+                            dayCell.classList.add('partial');
+                        }
+
+                        // Show stars if there are any
+                        if (totalStars > 0) {
+                            const starsLabel = document.createElement('div');
+                            const starsPerRow = 3;
+                            const rows = [];
+                            for (let j = 0; j < totalStars; j += starsPerRow) {
+                                const starsInRow = Math.min(starsPerRow, totalStars - j);
+                                rows.push('⭐'.repeat(starsInRow));
+                            }
+                            starsLabel.innerHTML = rows.join('<br>');
+                            starsLabel.style.fontSize = '0.6rem';
+                            starsLabel.style.fontWeight = 'bold';
+                            starsLabel.style.color = '#f59e0b';
+                            starsLabel.style.marginTop = '2px';
+                            starsLabel.style.textShadow = '0 1px 2px rgba(0,0,0,0.1)';
+                            starsLabel.style.lineHeight = '1';
+                            starsLabel.style.textAlign = 'center';
+                            dayCell.appendChild(starsLabel);
+                        } else {
+                            // Show empty state for days with data but no completion
+                            const starsLabel = document.createElement('div');
+                            starsLabel.textContent = '-';
+                            starsLabel.style.fontSize = '0.6rem';
+                            starsLabel.style.color = '#9ca3af';
+                            starsLabel.style.marginTop = '2px';
+                            dayCell.appendChild(starsLabel);
+                        }
+                    } else {
+                        // Show empty state for days without data
+                        const emptyLabel = document.createElement('div');
+                        emptyLabel.textContent = '-';
+                        emptyLabel.style.fontSize = '0.6rem';
+                        emptyLabel.style.color = '#9ca3af';
+                        emptyLabel.style.marginTop = '2px';
+                        dayCell.appendChild(emptyLabel);
+                    }
+                }
+
+                gridContainer.appendChild(dayCell);
+            }
+
+            monthlyContainer.appendChild(gridContainer);
+            monthlyGrid.appendChild(monthlyContainer);
+
+        } catch (error) {
+            console.error('Error loading monthly data:', error);
+            monthlyGrid.innerHTML = 'Error loading monthly data';
+        }
     }
 }
 

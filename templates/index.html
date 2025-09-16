@@ -27,6 +27,13 @@
                         <span class="streak-label">day streak</span>
                     </span>
                 </div>
+                <div class="star-counter">
+                    <span class="star-icon">⭐</span>
+                    <span class="star-text">
+                        <span class="star-number" id="starCount">0</span>
+                        <span class="star-label">total stars</span>
+                    </span>
+                </div>
             </div>
             <div class="date-display" id="dateDisplay">{{ today }}</div>
         </header>
@@ -80,6 +87,18 @@
             <div class="summary-content" id="summaryContent" style="display: none;">
                 <h3>This Week's Progress</h3>
                 <div class="weekly-grid" id="weeklyGrid"></div>
+            </div>
+        </section>
+
+        <!-- Monthly Summary (initially hidden) -->
+        <section class="monthly-summary">
+            <button class="summary-toggle" id="monthlySummaryToggle">
+                <span>View Monthly Progress</span>
+                <span class="toggle-icon">📅</span>
+            </button>
+            <div class="summary-content" id="monthlySummaryContent" style="display: none;">
+                <h3 id="monthlyTitle">This Month's Progress</h3>
+                <div class="monthly-grid" id="monthlyGrid"></div>
             </div>
         </section>
     </div>
