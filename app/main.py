@@ -9,7 +9,7 @@ from typing import Dict
 from .core.config import TASKS, TASK_LEVELS
 from .core import db
 
-app = FastAPI(title="Daily Wellness Tracker")
+app = FastAPI(title="Daily Check-in")
 
 
 @app.on_event("startup")
@@ -32,7 +32,7 @@ async def index(request: Request):
     status = db.get_today_status()
     today = date.today().isoformat()
     return templates.TemplateResponse(
-        "index.html", {"request": request, "today": today, "tasks": TASKS, "status": status, "task_levels": TASK_LEVELS}
+        "index.html", {"request": request, "today": today, "task_levels": TASK_LEVELS, "status": status}
     )
 
 
@@ -69,7 +69,7 @@ async def api_today():
     try:
         db.ensure_today_rows()
         status = db.get_today_status()
-        return {"date": date.today().isoformat(), "status": status, "tasks": TASKS, "task_levels": TASK_LEVELS}
+        return {"date": date.today().isoformat(), "status": status, "task_levels": TASK_LEVELS}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Database error: {str(e)}"})
 
@@ -79,9 +79,21 @@ async def api_history(days: int = 30):
     """Get completion history"""
     try:
         hist = db.get_history(days=days)
-        return {"history": hist, "tasks": TASKS, "days": days}
+        return {"history": hist, "task_levels": TASK_LEVELS, "days": days}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Database error: {str(e)}"})
+
+
+@app.get("/api/config")
+async def api_config():
+    """Get application configuration"""
+    return {"task_levels": TASK_LEVELS}
+
+
+@app.get("/.well-known/appspecific/com.chrome.devtools.json")
+async def devtools_config():
+    """Chrome DevTools configuration endpoint - prevents 404 errors in logs"""
+    return {}
 
 
 # dev run: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

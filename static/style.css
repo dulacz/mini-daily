@@ -377,22 +377,6 @@ body {
     text-align: center;
 }
 
-.task-streak {
-    text-align: center;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
-}
-
-.task-streak-text {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-}
-
-.task-streak-count {
-    font-weight: 600;
-    color: var(--primary-color);
-}
-
 /* Achievement Popup */
 .achievements {
     position: fixed;

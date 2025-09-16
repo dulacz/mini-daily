@@ -6,7 +6,8 @@
  */
 class WellnessTracker {
     constructor() {
-        this.tasks = ['reading', 'exercise', 'caring'];
+        this.tasks = []; // Will be loaded from backend
+        this.taskLevels = {}; // Will be loaded from backend
         this.taskData = this.loadData();
         this.achievements = [
             { id: 'first_star', title: 'Getting Started!', message: 'You earned your first star today!', triggered: false },
@@ -22,7 +23,10 @@ class WellnessTracker {
      */
     async init() {
         try {
-            this.checkNewDay();
+            // Load configuration from backend first
+            await this.loadConfig();
+
+            await this.checkNewDay();
             this.setupEventListeners();
             this.updateDisplay();
 
@@ -31,6 +35,89 @@ class WellnessTracker {
         } catch (error) {
             console.error('Error initializing WellnessTracker:', error);
         }
+    }
+
+    /**
+     * Load configuration from backend
+     */
+    async loadConfig() {
+        try {
+            const response = await fetch('/api/config');
+            if (response.ok) {
+                const config = await response.json();
+                this.taskLevels = config.task_levels || {}; // fallback
+                // Derive tasks from task_levels keys
+                this.tasks = Object.keys(this.taskLevels).length > 0 ?
+                    Object.keys(this.taskLevels) :
+                    ['reading', 'exercise', 'caring']; // fallback
+                console.log('Loaded config:', config);
+
+                // Generate task cards after loading config
+                this.generateTaskCards();
+            } else {
+                throw new Error('Failed to load config');
+            }
+        } catch (error) {
+            console.error('Error loading config, using defaults:', error);
+            // Use fallback values if config loading fails
+            this.tasks = ['reading', 'exercise', 'caring'];
+            this.taskLevels = {};
+            this.generateTaskCards(); // Generate with fallback data
+        }
+    }
+
+    /**
+     * Generate task cards dynamically from configuration
+     */
+    generateTaskCards() {
+        const tasksContainer = document.getElementById('tasksContainer');
+        if (!tasksContainer) return;
+
+        tasksContainer.innerHTML = ''; // Clear existing content
+
+        this.tasks.forEach(taskId => {
+            const taskConfig = this.taskLevels[taskId];
+            const taskCard = document.createElement('div');
+            taskCard.className = 'task-card';
+            taskCard.setAttribute('data-task', taskId);
+
+            // Fallback values if config is missing
+            const title = taskConfig?.title || this.capitalizeFirst(taskId);
+            const icon = taskConfig?.icon || '⭐';
+            const description = taskConfig?.description || `Complete your ${taskId} task`;
+            const levels = taskConfig?.levels || { 1: "Level 1", 2: "Level 2", 3: "Level 3" };
+
+            taskCard.innerHTML = `
+                <div class="task-header">
+                    <div class="task-icon">${icon}</div>
+                    <h3 class="task-title">${title}</h3>
+                    <div class="task-badge" id="${taskId}Badge">Not Started</div>
+                </div>
+                <div class="task-description">
+                    <span class="task-desc-text">${description}</span>
+                </div>
+                <div class="star-rating" data-task="${taskId}">
+                    ${Object.entries(levels).map(([level, desc]) => `
+                        <button class="star-btn" data-level="${level}" title="${desc}">
+                            <span class="star-icon">⭐</span>
+                            <span class="star-label">${desc}</span>
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+
+            tasksContainer.appendChild(taskCard);
+        });
+
+        // Re-setup event listeners for the new buttons
+        this.setupTaskEventListeners();
+    }
+
+    /**
+     * Helper to capitalize first letter
+     */
+    capitalizeFirst(str) {
+        return str.charAt(0).toUpperCase() + str.slice(1);
     }
 
     /**
@@ -59,7 +146,7 @@ class WellnessTracker {
                     });
 
                     this.saveData();
-                    this.updateDisplay();
+                    await this.updateDisplay();
                 }
             }
         } catch (error) {
@@ -104,9 +191,6 @@ class WellnessTracker {
                 }
             },
             streaks: {
-                reading: 0,
-                exercise: 0,
-                caring: 0,
                 overall: 0
             },
             achievements: []
@@ -158,10 +242,10 @@ class WellnessTracker {
     /**
      * Check if it's a new day and reset if needed
      */
-    checkNewDay() {
+    async checkNewDay() {
         const today = this.getDateString();
         if (this.taskData.currentDate !== today) {
-            this.startNewDay(today);
+            await this.startNewDay(today);
         }
     }
 
@@ -169,9 +253,9 @@ class WellnessTracker {
      * Start a new day
      * @param {string} today - Today's date string
      */
-    startNewDay(today) {
+    async startNewDay(today) {
         // Calculate streaks before resetting
-        this.updateStreaks();
+        await this.updateStreaks();
 
         // Create new day entry
         this.taskData.daily[today] = {
@@ -183,45 +267,120 @@ class WellnessTracker {
 
         this.taskData.currentDate = today;
         this.saveData();
-        this.updateDisplay();
+        await this.updateDisplay();
     }
 
     /**
-     * Update streak counters
+     * Update streak counters using recursive calculation
      */
-    updateStreaks() {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = this.getDateString(yesterday);
+    async updateStreaks() {
+        // Calculate the true streak by counting backwards through history
+        this.taskData.streaks.overall = await this.calculateTrueStreak();
+    }
 
-        if (this.taskData.daily[yesterdayStr]) {
-            // Update individual task streaks
-            this.tasks.forEach(task => {
-                if (this.taskData.daily[yesterdayStr][task] > 0) {
-                    this.taskData.streaks[task] = (this.taskData.streaks[task] || 0) + 1;
-                } else {
-                    this.taskData.streaks[task] = 0;
+    /**
+     * Calculate the actual streak by checking backwards through history
+     */
+    async calculateTrueStreak() {
+        try {
+            // Fetch historical data from backend
+            const response = await fetch('/api/history?days=365');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const history = data.history;
+
+            let streakCount = 0;
+            const today = new Date();
+
+            // Start from yesterday and work backwards
+            for (let i = 1; i <= 365; i++) {
+                const checkDate = new Date(today);
+                checkDate.setDate(today.getDate() - i);
+                const checkDateStr = this.getDateString(checkDate);
+
+                const dayData = history[checkDateStr];
+
+                // If no data for this day, stop counting
+                if (!dayData) {
+                    break;
                 }
-            });
 
-            // Update overall streak
-            const completedYesterday = this.taskData.daily[yesterdayStr].completed || [];
-            if (completedYesterday.length >= 2) {
-                this.taskData.streaks.overall = (this.taskData.streaks.overall || 0) + 1;
+                // Check if all tasks were completed that day
+                const allTasksCompleted = this.tasks.every(task =>
+                    dayData[task] > 0
+                );
+
+                if (allTasksCompleted) {
+                    streakCount++;
+                } else {
+                    // Found a day without all tasks completed, stop counting
+                    break;
+                }
+            }
+
+            return streakCount;
+        } catch (error) {
+            console.error('Error calculating streak from backend:', error);
+            // Fallback to localStorage data
+            return this.calculateTrueStreakFromLocal();
+        }
+    }
+
+    /**
+     * Fallback method to calculate streak from localStorage (limited data)
+     */
+    calculateTrueStreakFromLocal() {
+        let streakCount = 0;
+        const today = new Date();
+
+        // Start from yesterday and work backwards
+        for (let i = 1; i <= 365; i++) {
+            const checkDate = new Date(today);
+            checkDate.setDate(today.getDate() - i);
+            const checkDateStr = this.getDateString(checkDate);
+
+            const dayData = this.taskData.daily[checkDateStr];
+
+            // If no data for this day, stop counting
+            if (!dayData) {
+                break;
+            }
+
+            // Check if all tasks were completed that day
+            const allTasksCompleted = this.tasks.every(task =>
+                dayData[task] > 0
+            );
+
+            if (allTasksCompleted) {
+                streakCount++;
             } else {
-                this.taskData.streaks.overall = 0;
+                // Found a day without all tasks completed, stop counting
+                break;
             }
         }
+
+        return streakCount;
+    }
+
+    /**
+     * Manually recalculate and update streak (useful for testing/debugging)
+     */
+    async recalculateStreak() {
+        await this.updateStreaks();
+        await this.updateStreakDisplay();
+        this.saveData();
+        console.log('Streak recalculated:', this.taskData.streaks.overall);
     }
 
     /**
      * Setup event listeners
      */
     setupEventListeners() {
-        // Star button clicks
-        document.querySelectorAll('.star-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.handleStarClick(e));
-        });
+        // Setup task-specific listeners (will be called after task cards are generated)
+        this.setupTaskEventListeners();
 
         // Weekly summary toggle
         const summaryToggle = document.getElementById('summaryToggle');
@@ -234,6 +393,16 @@ class WellnessTracker {
             if (e.target.closest('.achievements')) {
                 this.hideAchievement();
             }
+        });
+    }
+
+    /**
+     * Setup task-specific event listeners (called after task cards are generated)
+     */
+    setupTaskEventListeners() {
+        // Star button clicks
+        document.querySelectorAll('.star-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.handleStarClick(e));
         });
     }
 
@@ -296,7 +465,7 @@ class WellnessTracker {
                 }
 
                 this.saveData();
-                this.updateDisplay();
+                await this.updateDisplay();
                 this.checkAchievements();
 
                 // Add visual feedback
@@ -321,7 +490,7 @@ class WellnessTracker {
             }
 
             this.saveData();
-            this.updateDisplay();
+            await this.updateDisplay();
             this.checkAchievements();
             this.addCompletionFeedback(task, newLevel);
         }
@@ -355,12 +524,12 @@ class WellnessTracker {
     /**
      * Update all display elements
      */
-    updateDisplay() {
+    async updateDisplay() {
         this.updateDateDisplay();
         this.updateProgressCircle();
         this.updateStats();
         this.updateTaskCards();
-        this.updateStreakDisplay();
+        await this.updateStreakDisplay();
         this.updateWeeklySummary();
     }
 
@@ -389,12 +558,10 @@ class WellnessTracker {
         const today = this.getDateString();
         const todayData = this.taskData.daily[today];
 
-        const totalStars = Object.values(todayData).reduce((sum, val) => {
-            return sum + (typeof val === 'number' ? val : 0);
-        }, 0);
-
-        const maxStars = this.tasks.length * 3; // 3 stars per task
-        const percentage = Math.round((totalStars / maxStars) * 100);
+        // Calculate percentage based on completed tasks (out of 3) instead of stars
+        const completedTasks = todayData.completed.length;
+        const totalTasks = this.tasks.length; // Should be 3
+        const percentage = Math.round((completedTasks / totalTasks) * 100);
 
         const progressCircle = document.getElementById('progressCircle');
         const progressPercentage = document.getElementById('progressPercentage');
@@ -438,7 +605,6 @@ class WellnessTracker {
             const taskLevel = todayData[task];
             const taskCard = document.querySelector(`[data-task="${task}"]`);
             const badge = document.getElementById(`${task}Badge`);
-            const streakCount = document.getElementById(`${task}Streak`);
 
             if (taskCard) {
                 // Update star buttons
@@ -473,22 +639,42 @@ class WellnessTracker {
                     badge.className = 'task-badge completed';
                 }
             }
-
-            // Update streak
-            if (streakCount) {
-                streakCount.textContent = this.taskData.streaks[task] || 0;
-            }
         });
     }
 
     /**
      * Update streak display
      */
-    updateStreakDisplay() {
+    async updateStreakDisplay() {
         const streakCount = document.getElementById('streakCount');
         if (streakCount) {
-            streakCount.textContent = this.taskData.streaks.overall || 0;
+            // Calculate potential streak including today's progress
+            const currentStreak = await this.calculateCurrentStreak();
+            streakCount.textContent = currentStreak;
         }
+    }
+
+    /**
+     * Calculate current streak including today's potential using recursive method
+     */
+    async calculateCurrentStreak() {
+        const today = this.getDateString();
+        const todayData = this.taskData.daily[today];
+
+        // Check if all tasks have at least 1 star today
+        const allTasksCompletedToday = this.tasks.every(task =>
+            todayData[task] > 0
+        );
+
+        // Calculate historical streak using recursive method
+        let currentStreak = await this.calculateTrueStreak();
+
+        // If all tasks are completed today, add 1 to display the potential streak
+        if (allTasksCompletedToday) {
+            currentStreak += 1;
+        }
+
+        return currentStreak;
     }
 
     /**
