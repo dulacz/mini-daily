@@ -6,88 +6,223 @@ users:
     name: "Alice"
     color: "#6366f1"  # Primary blue
     tasks:
-      reading:
-        title: "Reading"
+      knowledge:
+        title: "Knowledge"
+        description: "Feed your mind with knowledge"
         icon: "📚"
-        description: "Feed your mind with knowledge!"
-        levels:
-          1: "1 chapter"
-          2: "30 minutes reading"
-          3: "1 hour deep reading"
-      exercise:
+        activities:
+          reading:
+            label: "Reading"
+            levels:
+              1: "1 chapter"
+              2: "30 minutes reading"
+              3: "1 hour deep reading"
+          watching:
+            label: "Watching Documentary"
+            levels:
+              1: "5 minutes"
+              2: "10 minutes"
+              3: "20 minutes"
+          listening:
+            label: "Listening to Audio Books"
+            levels:
+              1: "5 minutes"
+              2: "10 minutes"
+              3: "20 minutes"
+      fitness:
         title: "Fitness"
+        description: "Stay strong and healthy"
         icon: "💪"
-        description: "Stay strong and healthy!"
-        levels:
-          1: "15 minutes walk"
-          2: "30 minutes workout"
-          3: "1 hour gym session"
+        activities:
+          walking:
+            label: "Walking"
+            levels:
+              1: "15 minutes walk"
+              2: "30 minutes brisk walk"
+              3: "1 hour nature walk"
+          workout:
+            label: "Workout"
+            levels:
+              1: "15 minutes exercise"
+              2: "30 minutes workout"
+              3: "1 hour gym session"
+          yoga:
+            label: "Yoga"
+            levels:
+              1: "10 minutes stretching"
+              2: "20 minutes yoga"
+              3: "45 minutes flow"
       creativity:
         title: "Creative Work"
+        description: "Express your creativity"
         icon: "🎨"
-        description: "Express your creativity!"
-        levels:
-          1: "10 minutes sketching"
-          2: "30 minutes art"
-          3: "1 hour creative project"
+        activities:
+          drawing:
+            label: "Drawing"
+            levels:
+              1: "10 minutes sketching"
+              2: "30 minutes drawing"
+              3: "1 hour art project"
+          writing:
+            label: "Creative Writing"
+            levels:
+              1: "Write 1 paragraph"
+              2: "Write 1 page"
+              3: "Write 3 pages"
+          crafting:
+            label: "Crafting"
+            levels:
+              1: "15 minutes crafting"
+              2: "30 minutes project"
+              3: "1 hour creation"
 
   bob:
     name: "Bob"
     color: "#10b981"  # Green
     tasks:
-      coding:
+      programming:
         title: "Programming"
+        description: "Build amazing things"
         icon: "💻"
-        description: "Build amazing things!"
-        levels:
-          1: "30 minutes coding"
-          2: "1 hour development"
-          3: "2 hours deep work"
+        activities:
+          coding:
+            label: "Coding"
+            levels:
+              1: "30 minutes coding"
+              2: "1 hour development"
+              3: "2 hours deep work"
+          debugging:
+            label: "Debugging"
+            levels:
+              1: "Fix 1 small bug"
+              2: "Debug 1 feature"
+              3: "Solve complex issue"
+          projects:
+            label: "Personal Projects"
+            levels:
+              1: "Plan 1 feature"
+              2: "Build 1 component"
+              3: "Complete 1 milestone"
       learning:
         title: "Learning"
+        description: "Expand your knowledge"
         icon: "🧠"
-        description: "Expand your knowledge!"
-        levels:
-          1: "Watch 1 tutorial"
-          2: "Complete 1 lesson"
-          3: "Finish 1 course module"
+        activities:
+          tutorials:
+            label: "Tutorials"
+            levels:
+              1: "Watch 1 tutorial"
+              2: "Complete 1 lesson"
+              3: "Finish 1 course module"
+          reading:
+            label: "Technical Reading"
+            levels:
+              1: "Read 1 article"
+              2: "Study 1 chapter"
+              3: "Deep dive 2 hours"
+          practice:
+            label: "Hands-on Practice"
+            levels:
+              1: "15 minutes practice"
+              2: "30 minutes exercises"
+              3: "1 hour lab work"
       networking:
         title: "Networking"
+        description: "Connect with others"
         icon: "🤝"
-        description: "Connect with others!"
-        levels:
-          1: "1 LinkedIn message"
-          2: "Join 1 community"
-          3: "Attend 1 event"
+        activities:
+          social:
+            label: "Social Media"
+            levels:
+              1: "1 LinkedIn message"
+              2: "Share 1 post"
+              3: "Engage in discussions"
+          community:
+            label: "Communities"
+            levels:
+              1: "Read community posts"
+              2: "Join 1 community"
+              3: "Contribute to discussion"
+          events:
+            label: "Events"
+            levels:
+              1: "Research 1 event"
+              2: "Register for event"
+              3: "Attend 1 event"
 
   carol:
     name: "Carol"
     color: "#f59e0b"  # Orange
     tasks:
-      meditation:
-        title: "Meditation"
+      mindfulness:
+        title: "Mindfulness"
+        description: "Find inner peace"
         icon: "🧘"
-        description: "Find inner peace!"
-        levels:
-          1: "5 minutes breathing"
-          2: "15 minutes meditation"
-          3: "30 minutes mindfulness"
-      journaling:
-        title: "Journaling"
+        activities:
+          meditation:
+            label: "Meditation"
+            levels:
+              1: "5 minutes breathing"
+              2: "15 minutes meditation"
+              3: "30 minutes mindfulness"
+          breathing:
+            label: "Breathing Exercises"
+            levels:
+              1: "2 minutes breathing"
+              2: "5 minute breathwork"
+              3: "10 minute techniques"
+          mindful_movement:
+            label: "Mindful Movement"
+            levels:
+              1: "5 minutes stretching"
+              2: "15 minutes yoga"
+              3: "30 minutes flow"
+      reflection:
+        title: "Reflection"
+        description: "Reflect and grow"
         icon: "📔"
-        description: "Reflect and grow!"
-        levels:
-          1: "3 gratitudes"
-          2: "Morning pages"
-          3: "Deep reflection"
+        activities:
+          journaling:
+            label: "Journaling"
+            levels:
+              1: "3 gratitudes"
+              2: "Morning pages"
+              3: "Deep reflection"
+          gratitude:
+            label: "Gratitude Practice"
+            levels:
+              1: "List 3 things"
+              2: "Detailed gratitude"
+              3: "Share appreciation"
+          review:
+            label: "Day Review"
+            levels:
+              1: "Quick check-in"
+              2: "Honest assessment"
+              3: "Plan improvements"
       nature:
         title: "Nature Time"
+        description: "Connect with nature"
         icon: "🌿"
-        description: "Connect with nature!"
-        levels:
-          1: "10 minutes outdoors"
-          2: "30 minutes nature walk"
-          3: "1 hour hiking"
+        activities:
+          walking:
+            label: "Nature Walks"
+            levels:
+              1: "10 minutes outdoors"
+              2: "30 minutes nature walk"
+              3: "1 hour hiking"
+          gardening:
+            label: "Gardening"
+            levels:
+              1: "Water plants"
+              2: "Tend to garden"
+              3: "Major garden work"
+          observation:
+            label: "Nature Observation"
+            levels:
+              1: "Notice surroundings"
+              2: "Document findings"
+              3: "Deep nature study"
 
 # Default user for backward compatibility
 default_user: "alice"

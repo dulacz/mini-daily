@@ -15,7 +15,6 @@ class WellnessTracker {
         this.achievements = [
             { id: 'first_star', title: 'Getting Started!', message: 'You earned your first star today!', triggered: false },
             { id: 'all_tasks', title: 'Perfect Day!', message: 'You completed all three wellness tasks today!', triggered: false },
-            { id: 'week_streak', title: 'Week Warrior!', message: 'You maintained a 7-day streak!', triggered: false },
             { id: 'month_streak', title: 'Monthly Master!', message: '30 days of consistency - amazing!', triggered: false }
         ];
         this.init();
@@ -45,6 +44,9 @@ class WellnessTracker {
             // Create animated background particles
             this.createParticles();
 
+            // Start auto theme checker
+            this.startAutoThemeChecker();
+
             // Sync with backend on startup
             await this.syncWithBackend();
         } catch (error) {
@@ -66,8 +68,6 @@ class WellnessTracker {
 
                 // Set current user's tasks and levels
                 await this.setCurrentUser(this.currentUser);
-
-                console.log('Loaded multi-user config:', config);
             } else {
                 throw new Error('Failed to load config');
             }
@@ -160,6 +160,14 @@ class WellnessTracker {
         // Update background gradient for new user
         this.updateUserBackground(userId);
 
+        // Collapse monthly summary when switching users
+        const summaryContent = document.getElementById('monthlySummaryContent');
+        const summaryToggle = document.getElementById('monthlySummaryToggle');
+        if (summaryContent && summaryToggle) {
+            summaryContent.style.display = 'none';
+            summaryToggle.classList.remove('active');
+        }
+
         // Switch user and reload data
         await this.setCurrentUser(userId);
         this.taskData = this.loadData();
@@ -183,39 +191,18 @@ class WellnessTracker {
             const title = taskConfig?.title || this.capitalizeFirst(taskId);
             const icon = taskConfig?.icon || '⭐';
             const description = taskConfig?.description || `Complete your ${taskId} task`;
-            const levels = taskConfig?.levels || { 1: "Level 1", 2: "Level 2", 3: "Level 3" };
 
-            taskCard.innerHTML = `
-                <div class="task-header">
-                    <div class="task-icon">${icon}</div>
-                    <h3 class="task-title">${title}</h3>
-                    <div class="task-badge" id="${taskId}Badge">Not Started</div>
-                </div>
-                <div class="task-description">
-                    <span class="task-desc-text">${description}</span>
-                </div>
-                <div class="star-rating" data-task="${taskId}">
-                    ${Object.entries(levels).map(([level, desc]) => `
-                        <button class="star-btn" data-level="${level}" title="${desc}">
-                            <span class="star-icon">⭐</span>
-                            <span class="star-label">${desc}</span>
-                        </button>
-                    `).join('')}
-                </div>
-                <div class="task-note-section" data-task="${taskId}">
-                    <div class="note-display" id="${taskId}NoteDisplay" style="display: none;">
-                        <div class="note-content" id="${taskId}NoteContent"></div>
-                        <button class="note-edit-btn" data-task="${taskId}">Edit Note</button>
-                    </div>
-                    <div class="note-input-section" id="${taskId}NoteInput">
-                        <textarea class="note-input" id="${taskId}NoteTextarea" placeholder="Add a note about your progress..." rows="2"></textarea>
-                        <div class="note-buttons">
-                            <button class="note-save-btn" data-task="${taskId}">Save Note</button>
-                            <button class="note-cancel-btn" data-task="${taskId}" style="display: none;">Cancel</button>
-                        </div>
-                    </div>
-                </div>
-            `;
+            // Check if this task has activities (hierarchical structure)
+            const activities = taskConfig?.activities;
+
+            if (activities && Object.keys(activities).length > 0) {
+                // New hierarchical structure - show activity selection first
+                taskCard.innerHTML = this.generateHierarchicalTaskCard(taskId, title, icon, description, activities);
+            } else {
+                // Legacy structure - direct level selection
+                const levels = taskConfig?.levels || { 1: "Level 1", 2: "Level 2", 3: "Level 3" };
+                taskCard.innerHTML = this.generateLegacyTaskCard(taskId, title, icon, description, levels);
+            }
 
             tasksContainer.appendChild(taskCard);
         });
@@ -225,6 +212,103 @@ class WellnessTracker {
 
         // Load existing notes for tasks
         this.loadTaskNotes();
+    }
+
+    /**
+     * Generate task card for new hierarchical structure (task -> activity -> levels)
+     */
+    generateHierarchicalTaskCard(taskId, title, icon, description, activities) {
+        return `
+            <div class="task-header">
+                <div class="task-icon">${icon}</div>
+                <h3 class="task-title">${title}</h3>
+                <div class="task-badge not-started" id="${taskId}Badge">Not Started</div>
+            </div>
+            <div class="task-description">
+                <span class="task-desc-text">${description}</span>
+            </div>
+            
+            <!-- Activity Selection Phase -->
+            <div class="activity-selection" id="${taskId}ActivitySelection">
+                <div class="activity-buttons">
+                    ${Object.entries(activities).map(([activityId, activityConfig]) => `
+                        <button class="activity-btn" data-task="${taskId}" data-activity="${activityId}">
+                            <div class="activity-content">
+                                <span class="activity-label">${activityConfig.label || this.capitalizeFirst(activityId)}</span>
+                                <div class="activity-progress" id="${taskId}_${activityId}_progress">
+                                    <span class="progress-dots">
+                                        <span class="progress-dot"></span>
+                                        <span class="progress-dot"></span>
+                                        <span class="progress-dot"></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <!-- Level Selection Phase (initially hidden) -->
+            <div class="level-selection" id="${taskId}LevelSelection" style="display: none;">
+                <h4 id="${taskId}LevelTitle">Choose Level:</h4>
+                <div class="star-rating" data-task="${taskId}" id="${taskId}StarRating">
+                    <!-- Levels will be populated when activity is selected -->
+                </div>
+                <button class="back-to-activities-btn" data-task="${taskId}">← Back to Activities</button>
+            </div>
+            
+            <!-- Note Section -->
+            <div class="task-note-section" data-task="${taskId}" id="${taskId}NoteSection" style="display: none;">
+                <div class="note-display" id="${taskId}NoteDisplay" style="display: none;">
+                    <div class="note-content" id="${taskId}NoteContent"></div>
+                    <button class="note-edit-btn" data-task="${taskId}">Edit Note</button>
+                </div>
+                <div class="note-input-section" id="${taskId}NoteInput">
+                    <textarea class="note-input" id="${taskId}NoteTextarea" placeholder="Add a note about your progress..." rows="2"></textarea>
+                    <div class="note-buttons">
+                        <button class="note-save-btn" data-task="${taskId}">Save Note</button>
+                        <button class="note-cancel-btn" data-task="${taskId}" style="display: none;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Generate task card for legacy structure (direct level selection)
+     */
+    generateLegacyTaskCard(taskId, title, icon, description, levels) {
+        return `
+            <div class="task-header">
+                <div class="task-icon">${icon}</div>
+                <h3 class="task-title">${title}</h3>
+                <div class="task-badge not-started" id="${taskId}Badge">Not Started</div>
+            </div>
+            <div class="task-description">
+                <span class="task-desc-text">${description}</span>
+            </div>
+            <div class="star-rating" data-task="${taskId}">
+                ${Object.entries(levels).map(([level, desc]) => `
+                    <button class="star-btn" data-level="${level}" title="${desc}">
+                        <span class="star-icon">⭐</span>
+                        <span class="star-label">${desc}</span>
+                    </button>
+                `).join('')}
+            </div>
+            <div class="task-note-section" data-task="${taskId}">
+                <div class="note-display" id="${taskId}NoteDisplay" style="display: none;">
+                    <div class="note-content" id="${taskId}NoteContent"></div>
+                    <button class="note-edit-btn" data-task="${taskId}">Edit Note</button>
+                </div>
+                <div class="note-input-section" id="${taskId}NoteInput">
+                    <textarea class="note-input" id="${taskId}NoteTextarea" placeholder="Add a note about your progress..." rows="2"></textarea>
+                    <div class="note-buttons">
+                        <button class="note-save-btn" data-task="${taskId}">Save Note</button>
+                        <button class="note-cancel-btn" data-task="${taskId}" style="display: none;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     /**
@@ -504,7 +588,6 @@ class WellnessTracker {
         await this.updateStreaks();
         await this.updateStreakDisplay();
         this.saveData();
-        console.log('Streak recalculated:', this.taskData.streaks.overall);
     }
 
     /**
@@ -513,12 +596,6 @@ class WellnessTracker {
     setupEventListeners() {
         // Setup task-specific listeners (will be called after task cards are generated)
         this.setupTaskEventListeners();
-
-        // Weekly summary toggle
-        const summaryToggle = document.getElementById('summaryToggle');
-        if (summaryToggle) {
-            summaryToggle.addEventListener('click', () => this.toggleWeeklySummary());
-        }
 
         // Monthly summary toggle
         const monthlySummaryToggle = document.getElementById('monthlySummaryToggle');
@@ -530,6 +607,18 @@ class WellnessTracker {
         const themeToggle = document.getElementById('themeToggle');
         if (themeToggle) {
             themeToggle.addEventListener('click', () => this.toggleTheme());
+
+            // Double-click to re-enable auto theme
+            themeToggle.addEventListener('dblclick', () => {
+                this.enableAutoTheme();
+                // Show a brief confirmation
+                const originalText = themeToggle.textContent;
+                themeToggle.textContent = '🔄';
+                setTimeout(() => {
+                    const body = document.body;
+                    themeToggle.textContent = body.classList.contains('dark-theme') ? '☀️' : '🌙';
+                }, 1000);
+            });
         }
 
         // Achievement popup close (click anywhere)
@@ -544,9 +633,19 @@ class WellnessTracker {
      * Setup task-specific event listeners (called after task cards are generated)
      */
     setupTaskEventListeners() {
-        // Star button clicks
+        // Star button clicks (legacy structure)
         document.querySelectorAll('.star-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.handleStarClick(e));
+        });
+
+        // Activity button clicks (new hierarchical structure)
+        document.querySelectorAll('.activity-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.handleActivitySelect(e));
+        });
+
+        // Back to activities button clicks (new hierarchical structure)
+        document.querySelectorAll('.back-to-activities-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.handleBackToActivities(e));
         });
 
         // Note save button clicks
@@ -563,6 +662,162 @@ class WellnessTracker {
         document.querySelectorAll('.note-cancel-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.handleNoteCancel(e));
         });
+    }
+
+    /**
+     * Handle activity selection (new hierarchical structure)
+     */
+    async handleActivitySelect(event) {
+        const btn = event.currentTarget;
+        const task = btn.dataset.task;
+        const activity = btn.dataset.activity;
+
+        try {
+            // Get levels for this activity
+            const levelsResponse = await fetch(`/api/user/${this.currentUser}/task/${task}/activity/${activity}/levels`);
+            if (!levelsResponse.ok) throw new Error('Failed to load activity levels');
+
+            const levelsData = await levelsResponse.json();
+            const levels = levelsData.levels;
+
+            // Get current status for this activity
+            const statusResponse = await fetch(`/api/user/${this.currentUser}/task/${task}/activity/${activity}/status`);
+            let currentLevel = 0;
+            let currentNote = '';
+
+            if (statusResponse.ok) {
+                const statusData = await statusResponse.json();
+                currentLevel = statusData.level || 0;
+                currentNote = statusData.note || '';
+            }
+
+            // Hide activity selection, show level selection
+            const activitySelection = document.getElementById(`${task}ActivitySelection`);
+            const levelSelection = document.getElementById(`${task}LevelSelection`);
+            const levelTitle = document.getElementById(`${task}LevelTitle`);
+            const starRating = document.getElementById(`${task}StarRating`);
+
+            if (activitySelection) activitySelection.style.display = 'none';
+            if (levelSelection) levelSelection.style.display = 'block';
+
+            // Update level title
+            if (levelTitle) {
+                const activityConfig = this.taskLevels[task]?.activities?.[activity];
+                const activityLabel = activityConfig?.label || this.capitalizeFirst(activity);
+                levelTitle.textContent = `${activityLabel} - Choose Level:`;
+            }
+
+            // Generate level buttons
+            if (starRating) {
+                starRating.innerHTML = Object.entries(levels).map(([level, desc]) => {
+                    const levelNum = parseInt(level);
+                    const isActive = levelNum <= currentLevel ? 'active' : '';
+                    return `
+                        <button class="star-btn ${isActive}" data-task="${task}" data-activity="${activity}" data-level="${level}" title="${desc}">
+                            <span class="star-icon">⭐</span>
+                            <span class="star-label">${desc}</span>
+                        </button>
+                    `;
+                }).join('');
+
+                // Add event listeners to new star buttons
+                starRating.querySelectorAll('.star-btn').forEach(starBtn => {
+                    starBtn.addEventListener('click', (e) => this.handleActivityStarClick(e));
+                });
+            }
+
+            // Update task badge to show simplified status
+            const badge = document.getElementById(`${task}Badge`);
+            if (badge) {
+                if (currentLevel > 0) {
+                    badge.textContent = 'Completed';
+                    badge.className = 'task-badge completed';
+                } else {
+                    badge.textContent = 'Not Started';
+                    badge.className = 'task-badge not-started';
+                }
+            }
+
+            // Show note section if there's a current note or level
+            const noteSection = document.getElementById(`${task}NoteSection`);
+            if (noteSection && (currentLevel > 0 || currentNote)) {
+                noteSection.style.display = 'block';
+
+                // Update note content if exists
+                if (currentNote) {
+                    const noteContent = document.getElementById(`${task}NoteContent`);
+                    const noteDisplay = document.getElementById(`${task}NoteDisplay`);
+                    const noteInput = document.getElementById(`${task}NoteInput`);
+
+                    if (noteContent && noteDisplay && noteInput) {
+                        noteContent.textContent = currentNote;
+                        noteDisplay.style.display = 'block';
+                        noteInput.style.display = 'none';
+                    }
+                }
+            }
+
+        } catch (error) {
+            console.error('Error loading activity levels:', error);
+        }
+    }
+
+    /**
+     * Handle back to activities button click
+     */
+    async handleBackToActivities(event) {
+        const btn = event.currentTarget;
+        const task = btn.dataset.task;
+
+        // Show activity selection, hide level selection
+        const activitySelection = document.getElementById(`${task}ActivitySelection`);
+        const levelSelection = document.getElementById(`${task}LevelSelection`);
+        const noteSection = document.getElementById(`${task}NoteSection`);
+
+        if (activitySelection) activitySelection.style.display = 'block';
+        if (levelSelection) levelSelection.style.display = 'none';
+        if (noteSection) noteSection.style.display = 'none';
+
+        // Update badge with current actual status instead of resetting to "Not Started"
+        const badge = document.getElementById(`${task}Badge`);
+        if (badge) {
+            await this.updateTaskBadgeStatus(task, badge);
+        }
+
+        // Update activity progress indicators to reflect current state
+        await this.updateActivityProgress();
+
+        // Refresh top-level statistics (completion %, tasks done, stars today)
+        await this.updateProgressCircle();
+        await this.updateStats();
+        await this.updateStarDisplay();
+    }
+
+    /**
+     * Handle star clicks for hierarchical structure (task-activity-level)
+     */
+    async handleActivityStarClick(event) {
+        const btn = event.currentTarget;
+        const task = btn.dataset.task;
+        const activity = btn.dataset.activity;
+        const level = parseInt(btn.dataset.level);
+
+        // Get current level from UI to implement toggle behavior
+        const starRating = btn.closest('.star-rating');
+        const allStars = starRating.querySelectorAll('.star-btn');
+
+        // Count currently active stars to determine current level
+        let currentLevel = 0;
+        allStars.forEach(star => {
+            if (star.classList.contains('active')) {
+                currentLevel = Math.max(currentLevel, parseInt(star.dataset.level));
+            }
+        });
+
+        // Toggle behavior: if clicking the same level, set to 0, otherwise set to clicked level
+        const newLevel = currentLevel === level ? 0 : level;
+
+        await this.setTaskActivityLevel(task, activity, newLevel);
     }
 
     /**
@@ -653,6 +908,83 @@ class WellnessTracker {
             this.checkAchievements();
             this.addCompletionFeedback(task, newLevel);
         }
+    }
+
+    /**
+     * Set task-activity completion level (new hierarchical structure)
+     * @param {string} task - Task name
+     * @param {string} activity - Activity name
+     * @param {number} level - Completion level (1-3)
+     */
+    async setTaskActivityLevel(task, activity, level) {
+        try {
+            // Call backend API to update database for current user
+            const response = await fetch(`/api/user/${this.currentUser}/task/activity/level`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    task: task,
+                    activity: activity,
+                    level: level
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Update UI to show completion
+                this.updateTaskActivityUI(task, activity, level);
+
+                // Show note section
+                const noteSection = document.getElementById(`${task}NoteSection`);
+                if (noteSection) noteSection.style.display = 'block';
+
+                // Update task badge with actual status across all activities
+                const badge = document.getElementById(`${task}Badge`);
+                if (badge) {
+                    await this.updateTaskBadgeStatus(task, badge);
+                }
+
+                // Update activity progress indicators to reflect the change
+                await this.updateActivityProgress();
+
+                // Refresh top-level statistics (completion %, tasks done, stars today)
+                await this.updateProgressCircle();
+                await this.updateStats();
+                await this.updateStarDisplay();
+
+                // Add visual feedback
+                this.addCompletionFeedback(task, level);
+                this.checkAchievements();
+
+            } else {
+                console.error('Failed to update task activity level:', result.error);
+            }
+        } catch (error) {
+            console.error('Error updating task activity level:', error);
+        }
+    }
+
+    /**
+     * Update UI for task-activity completion
+     */
+    updateTaskActivityUI(task, activity, level) {
+        // Highlight selected level
+        const starButtons = document.querySelectorAll(`[data-task="${task}"][data-activity="${activity}"].star-btn`);
+        starButtons.forEach((btn, index) => {
+            const btnLevel = parseInt(btn.dataset.level);
+            if (btnLevel <= level) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
     }
 
     /**
@@ -825,12 +1157,12 @@ class WellnessTracker {
      */
     async updateDisplay() {
         this.updateDateDisplay();
-        this.updateProgressCircle();
-        this.updateStats();
+        await this.updateProgressCircle();
+        await this.updateStats();
         this.updateTaskCards();
         await this.updateStreakDisplay();
         await this.updateStarDisplay();
-        this.updateWeeklySummary();
+        await this.updateActivityProgress();
     }
 
     /**
@@ -854,14 +1186,39 @@ class WellnessTracker {
     /**
      * Update progress circle
      */
-    updateProgressCircle() {
-        const today = this.getDateString();
-        const todayData = this.taskData.daily[today];
+    async updateProgressCircle() {
+        // Calculate completion based on real-time task status
+        let completedTasksCount = 0;
 
-        // Calculate percentage based on completed tasks (out of 3) instead of stars
-        const completedTasks = todayData.completed.length;
+        for (const task of this.tasks) {
+            const taskConfig = this.taskLevels[task];
+            if (taskConfig && taskConfig.activities) {
+                let hasAnyStars = false;
+
+                // Check each activity to see if any has stars
+                for (const activityId of Object.keys(taskConfig.activities)) {
+                    try {
+                        const response = await fetch(`/api/user/${this.currentUser}/task/${task}/activity/${activityId}/status`);
+                        if (response.ok) {
+                            const activityData = await response.json();
+                            if (activityData.level && activityData.level > 0) {
+                                hasAnyStars = true;
+                                break;
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`Error checking activity status for ${task}/${activityId}:`, error);
+                    }
+                }
+
+                if (hasAnyStars) {
+                    completedTasksCount++;
+                }
+            }
+        }
+
         const totalTasks = this.tasks.length; // Should be 3
-        const percentage = Math.round((completedTasks / totalTasks) * 100);
+        const percentage = Math.round((completedTasksCount / totalTasks) * 100);
 
         const progressCircle = document.getElementById('progressCircle');
         const progressPercentage = document.getElementById('progressPercentage');
@@ -877,21 +1234,49 @@ class WellnessTracker {
     /**
      * Update stats display
      */
-    updateStats() {
+    async updateStats() {
         const today = this.getDateString();
         const todayData = this.taskData.daily[today];
 
-        const totalStars = Object.values(todayData).reduce((sum, val) => {
-            return sum + (typeof val === 'number' ? val : 0);
-        }, 0);
+        // Calculate both total stars and completion using real-time data for consistency
+        let totalStars = 0;
+        let completedTasksCount = 0;
 
-        const completedTasks = todayData.completed.length;
+        for (const task of this.tasks) {
+            const taskConfig = this.taskLevels[task];
+            if (taskConfig && taskConfig.activities) {
+                let hasAnyStars = false;
+                let taskStars = 0;
+
+                // Check each activity to see if any has stars and sum up the stars
+                for (const activityId of Object.keys(taskConfig.activities)) {
+                    try {
+                        const response = await fetch(`/api/user/${this.currentUser}/task/${task}/activity/${activityId}/status`);
+                        if (response.ok) {
+                            const activityData = await response.json();
+                            if (activityData.level && activityData.level > 0) {
+                                hasAnyStars = true;
+                                taskStars += activityData.level;
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`Error checking activity status for ${task}/${activityId}:`, error);
+                    }
+                }
+
+                totalStars += taskStars;
+
+                if (hasAnyStars) {
+                    completedTasksCount++;
+                }
+            }
+        }
 
         const totalStarsElement = document.getElementById('totalStars');
         const completedTasksElement = document.getElementById('completedTasks');
 
         if (totalStarsElement) totalStarsElement.textContent = totalStars;
-        if (completedTasksElement) completedTasksElement.textContent = completedTasks;
+        if (completedTasksElement) completedTasksElement.textContent = completedTasksCount;
     }
 
     /**
@@ -901,7 +1286,7 @@ class WellnessTracker {
         const today = this.getDateString();
         const todayData = this.taskData.daily[today];
 
-        this.tasks.forEach(task => {
+        this.tasks.forEach(async (task) => {
             const taskLevel = todayData[task];
             const taskCard = document.querySelector(`[data-task="${task}"]`);
             const badge = document.getElementById(`${task}Badge`);
@@ -926,23 +1311,95 @@ class WellnessTracker {
                 }
             }
 
-            // Update badge
+            // Update badge - check actual activity levels instead of cached task level
             if (badge) {
-                if (taskLevel === 0) {
-                    badge.textContent = 'Not Started';
-                    badge.className = 'task-badge';
-                } else if (taskLevel < 3) {
-                    badge.textContent = 'Started';
-                    badge.className = 'task-badge started';
-                } else {
-                    badge.textContent = 'Completed';
-                    badge.className = 'task-badge completed';
-                }
+                await this.updateTaskBadgeStatus(task, badge);
             }
         });
 
         // Load notes for current tasks
         this.loadTaskNotes();
+    }
+
+    /**
+     * Update badge status by checking actual activity levels
+     */
+    async updateTaskBadgeStatus(task, badge) {
+        const taskConfig = this.taskLevels[task];
+        if (!taskConfig || !taskConfig.activities) {
+            badge.textContent = 'Not Started';
+            badge.className = 'task-badge not-started';
+            return;
+        }
+
+        let hasAnyStars = false;
+
+        // Check each activity to see if any has stars
+        for (const activityId of Object.keys(taskConfig.activities)) {
+            try {
+                const response = await fetch(`/api/user/${this.currentUser}/task/${task}/activity/${activityId}/status`);
+                if (response.ok) {
+                    const activityData = await response.json();
+                    if (activityData.level && activityData.level > 0) {
+                        hasAnyStars = true;
+                        break;
+                    }
+                }
+            } catch (error) {
+                console.error(`Error checking activity status for ${task}/${activityId}:`, error);
+            }
+        }
+
+        // Update badge based on actual activity levels
+        if (hasAnyStars) {
+            badge.textContent = 'Completed';
+            badge.className = 'task-badge completed';
+        } else {
+            badge.textContent = 'Not Started';
+            badge.className = 'task-badge not-started';
+        }
+    }
+
+    /**
+     * Update activity progress indicators
+     */
+    async updateActivityProgress() {
+        // Update each activity progress indicator
+        for (const taskId of this.tasks) {
+            const taskConfig = this.taskLevels[taskId];
+            if (!taskConfig || !taskConfig.activities) continue;
+
+            for (const activityId of Object.keys(taskConfig.activities)) {
+                const progressElement = document.getElementById(`${taskId}_${activityId}_progress`);
+                if (!progressElement) continue;
+
+                try {
+                    // Get activity status from backend
+                    const response = await fetch(`/api/user/${this.currentUser}/task/${taskId}/activity/${activityId}/status`);
+                    if (!response.ok) {
+                        console.warn(`Failed to fetch status for ${taskId}/${activityId}`);
+                        continue;
+                    }
+
+                    const activityData = await response.json();
+                    const currentLevel = activityData.level || 0;
+                    const maxLevel = 3;
+
+                    // Update progress dots
+                    const dots = progressElement.querySelectorAll('.progress-dot');
+                    dots.forEach((dot, index) => {
+                        if (index < currentLevel) {
+                            dot.classList.add('active');
+                        } else {
+                            dot.classList.remove('active');
+                        }
+                    });
+
+                } catch (error) {
+                    console.error(`Error updating progress for ${taskId}/${activityId}:`, error);
+                }
+            }
+        }
     }
 
     /**
@@ -1006,11 +1463,11 @@ class WellnessTracker {
             let totalStars = 0;
 
             // Calculate total stars from backend data
-            // Iterate over all dates in the history object
+            // The backend already provides MAX level per task per day
             for (const dateStr in history) {
                 const dayData = history[dateStr];
-                // dayData is an object like {caring: 3, exercise: 1, reading: 3}
-                // Sum all task levels for this date
+                // dayData is an object like {knowledge: 3, fitness: 1, creativity: 3}
+                // Sum all task levels for this date (already MAX levels from backend)
                 for (const task in dayData) {
                     if (typeof dayData[task] === 'number') {
                         totalStars += dayData[task];
@@ -1018,12 +1475,14 @@ class WellnessTracker {
                 }
             }
 
-            // Add today's stars from local data
+            // Add today's stars from local data (only count task levels)
             const today = this.getDateString();
             const todayData = this.taskData.daily[today];
-            const todayStars = Object.values(todayData).reduce((sum, val) => {
-                return sum + (typeof val === 'number' ? val : 0);
-            }, 0);
+            let todayStars = 0;
+            this.tasks.forEach(task => {
+                const taskLevel = todayData[task] || 0;
+                todayStars += (typeof taskLevel === 'number' ? taskLevel : 0);
+            });
             totalStars += todayStars;
 
             return totalStars;
@@ -1049,9 +1508,11 @@ class WellnessTracker {
 
             const dayData = this.taskData.daily[dateStr];
             if (dayData) {
-                Object.values(dayData).forEach(val => {
-                    if (typeof val === 'number') {
-                        totalStars += val;
+                // Only count task levels, not other properties like 'completed' array
+                this.tasks.forEach(task => {
+                    const taskLevel = dayData[task] || 0;
+                    if (typeof taskLevel === 'number') {
+                        totalStars += taskLevel;
                     }
                 });
             }
@@ -1067,10 +1528,12 @@ class WellnessTracker {
         const today = this.getDateString();
         const todayData = this.taskData.daily[today];
 
-        // First star achievement
-        const totalStars = Object.values(todayData).reduce((sum, val) => {
-            return sum + (typeof val === 'number' ? val : 0);
-        }, 0);
+        // First star achievement - calculate total stars properly
+        let totalStars = 0;
+        this.tasks.forEach(task => {
+            const taskLevel = todayData[task] || 0;
+            totalStars += (typeof taskLevel === 'number' ? taskLevel : 0);
+        });
 
         if (totalStars > 0 && !this.taskData.achievements.includes('first_star')) {
             this.triggerAchievement('first_star');
@@ -1082,10 +1545,6 @@ class WellnessTracker {
         }
 
         // Streak achievements
-        if (this.taskData.streaks.overall >= 7 && !this.taskData.achievements.includes('week_streak')) {
-            this.triggerAchievement('week_streak');
-        }
-
         if (this.taskData.streaks.overall >= 30 && !this.taskData.achievements.includes('month_streak')) {
             this.triggerAchievement('month_streak');
         }
@@ -1138,249 +1597,6 @@ class WellnessTracker {
                 achievementSection.style.display = 'none';
             }, 300);
         }
-    }
-
-    /**
-     * Toggle weekly summary display
-     */
-    toggleWeeklySummary() {
-        const summaryContent = document.getElementById('summaryContent');
-        const summaryToggle = document.getElementById('summaryToggle');
-
-        if (summaryContent && summaryToggle) {
-            const isVisible = summaryContent.style.display !== 'none';
-
-            if (isVisible) {
-                summaryContent.style.display = 'none';
-                summaryToggle.classList.remove('active');
-            } else {
-                summaryContent.style.display = 'block';
-                summaryToggle.classList.add('active');
-                this.renderWeeklyGrid();
-            }
-        }
-    }
-
-    /**
-     * Update weekly summary
-     */
-    updateWeeklySummary() {
-        // This will be called when the summary is toggled open
-    }
-
-    /**
-     * Render weekly progress grid
-     */
-    async renderWeeklyGrid() {
-        const weeklyGrid = document.getElementById('weeklyGrid');
-        if (!weeklyGrid) return;
-
-        weeklyGrid.innerHTML = 'Loading...';
-
-        try {
-            // Fetch historical data from backend for current user
-            const response = await fetch(`/api/user/${this.currentUser}/history?days=7`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            const history = data.history;
-
-            weeklyGrid.innerHTML = '';
-
-            // Get Monday to Sunday of current week in Pacific Time
-            const today = this.getPacificDate();
-            const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-            const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay; // Calculate days to Monday
-
-            const monday = new Date(today);
-            monday.setDate(today.getDate() + mondayOffset);
-
-            const weekDays = [];
-            for (let i = 0; i < 7; i++) {
-                const date = new Date(monday);
-                date.setDate(monday.getDate() + i);
-                weekDays.push(date);
-            }
-
-            weekDays.forEach(date => {
-                const dateStr = this.getDateString(date);
-                const dayData = history[dateStr];
-
-                const dayCell = document.createElement('div');
-                dayCell.className = 'day-cell';
-
-                const dayLabel = document.createElement('div');
-                dayLabel.textContent = date.toLocaleDateString('en-US', { weekday: 'short' });
-                dayCell.appendChild(dayLabel);
-
-                const dateLabel = document.createElement('div');
-                dateLabel.textContent = date.getDate();
-                dayCell.appendChild(dateLabel);
-
-                if (dayData) {
-                    // Count total stars from the database
-                    const totalStars = Object.values(dayData).reduce((sum, val) => {
-                        return sum + (typeof val === 'number' ? val : 0);
-                    }, 0);
-
-                    // Count completed tasks (tasks with level > 0)
-                    const completedTasks = Object.values(dayData).filter(val =>
-                        typeof val === 'number' && val > 0
-                    ).length;
-
-                    if (completedTasks === 3) {
-                        dayCell.classList.add('completed');
-                    } else if (totalStars > 0) {
-                        dayCell.classList.add('partial');
-                    }
-
-                    // Always show stars if there are any, make them more prominent
-                    if (totalStars > 0) {
-                        const starsLabel = document.createElement('div');
-                        // Create multiple rows with max 3 stars per row
-                        const starsPerRow = 3;
-                        const rows = [];
-                        for (let i = 0; i < totalStars; i += starsPerRow) {
-                            const starsInRow = Math.min(starsPerRow, totalStars - i);
-                            rows.push('⭐'.repeat(starsInRow));
-                        }
-                        starsLabel.innerHTML = rows.join('<br>');
-                        starsLabel.style.fontSize = '0.7rem';
-                        starsLabel.style.fontWeight = 'bold';
-                        starsLabel.style.color = '#f59e0b';
-                        starsLabel.style.marginTop = '2px';
-                        starsLabel.style.textShadow = '0 1px 2px rgba(0,0,0,0.1)';
-                        starsLabel.style.lineHeight = '1.1';
-                        starsLabel.style.textAlign = 'center';
-                        dayCell.appendChild(starsLabel);
-                    } else {
-                        // Show empty state for days with data but no completion
-                        const starsLabel = document.createElement('div');
-                        starsLabel.textContent = '-';
-                        starsLabel.style.fontSize = '0.7rem';
-                        starsLabel.style.color = '#9ca3af';
-                        starsLabel.style.marginTop = '2px';
-                        dayCell.appendChild(starsLabel);
-                    }
-
-                    console.log(`Day ${dateStr}: ${totalStars} stars, ${completedTasks} completed tasks`);
-                } else {
-                    // Show empty state for days without data
-                    const emptyLabel = document.createElement('div');
-                    emptyLabel.textContent = '-';
-                    emptyLabel.style.fontSize = '0.7rem';
-                    emptyLabel.style.color = '#9ca3af';
-                    emptyLabel.style.marginTop = '2px';
-                    dayCell.appendChild(emptyLabel);
-                } weeklyGrid.appendChild(dayCell);
-            });
-
-        } catch (error) {
-            console.error('Error loading weekly data:', error);
-            weeklyGrid.innerHTML = 'Error loading weekly data';
-
-            // Fallback to local storage data
-            setTimeout(() => {
-                this.renderWeeklyGridFromLocal();
-            }, 1000);
-        }
-    }
-
-    /**
-     * Fallback method to render weekly grid from local storage
-     */
-    renderWeeklyGridFromLocal() {
-        const weeklyGrid = document.getElementById('weeklyGrid');
-        if (!weeklyGrid) return;
-
-        weeklyGrid.innerHTML = '';
-
-        // Get Monday to Sunday of current week in Pacific Time
-        const today = this.getPacificDate();
-        const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
-
-        const monday = new Date(today);
-        monday.setDate(today.getDate() + mondayOffset);
-
-        const weekDays = [];
-        for (let i = 0; i < 7; i++) {
-            const date = new Date(monday);
-            date.setDate(monday.getDate() + i);
-            weekDays.push(date);
-        }
-
-        weekDays.forEach(date => {
-            const dateStr = this.getDateString(date);
-            const dayData = this.taskData.daily[dateStr];
-
-            const dayCell = document.createElement('div');
-            dayCell.className = 'day-cell';
-
-            const dayLabel = document.createElement('div');
-            dayLabel.textContent = date.toLocaleDateString('en-US', { weekday: 'short' });
-            dayCell.appendChild(dayLabel);
-
-            const dateLabel = document.createElement('div');
-            dateLabel.textContent = date.getDate();
-            dayCell.appendChild(dateLabel);
-
-            if (dayData) {
-                const completedTasks = dayData.completed ? dayData.completed.length : 0;
-                const totalStars = Object.values(dayData).reduce((sum, val) => {
-                    return sum + (typeof val === 'number' ? val : 0);
-                }, 0);
-
-                if (completedTasks === 3) {
-                    dayCell.classList.add('completed');
-                } else if (totalStars > 0) {
-                    dayCell.classList.add('partial');
-                }
-
-                // Always show stars if there are any, make them more prominent
-                if (totalStars > 0) {
-                    const starsLabel = document.createElement('div');
-                    // Create multiple rows with max 3 stars per row
-                    const starsPerRow = 3;
-                    const rows = [];
-                    for (let i = 0; i < totalStars; i += starsPerRow) {
-                        const starsInRow = Math.min(starsPerRow, totalStars - i);
-                        rows.push('⭐'.repeat(starsInRow));
-                    }
-                    starsLabel.innerHTML = rows.join('<br>');
-                    starsLabel.style.fontSize = '0.7rem';
-                    starsLabel.style.fontWeight = 'bold';
-                    starsLabel.style.color = '#f59e0b';
-                    starsLabel.style.marginTop = '2px';
-                    starsLabel.style.textShadow = '0 1px 2px rgba(0,0,0,0.1)';
-                    starsLabel.style.lineHeight = '1.1';
-                    starsLabel.style.textAlign = 'center';
-                    dayCell.appendChild(starsLabel);
-                } else {
-                    // Show empty state for days with data but no completion
-                    const starsLabel = document.createElement('div');
-                    starsLabel.textContent = '-';
-                    starsLabel.style.fontSize = '0.7rem';
-                    starsLabel.style.color = '#9ca3af';
-                    starsLabel.style.marginTop = '2px';
-                    dayCell.appendChild(starsLabel);
-                }
-
-                console.log(`Day ${dateStr} (local): ${totalStars} stars, ${completedTasks} completed tasks`);
-            } else {
-                // Show empty state for days without data
-                const emptyLabel = document.createElement('div');
-                emptyLabel.textContent = '-';
-                emptyLabel.style.fontSize = '0.7rem';
-                emptyLabel.style.color = '#9ca3af';
-                emptyLabel.style.marginTop = '2px';
-                dayCell.appendChild(emptyLabel);
-            }
-
-            weeklyGrid.appendChild(dayCell);
-        });
     }
 
     /**
@@ -1470,7 +1686,7 @@ class WellnessTracker {
             const gridContainer = document.createElement('div');
             gridContainer.style.display = 'grid';
             gridContainer.style.gridTemplateColumns = 'repeat(7, 1fr)';
-            gridContainer.style.gap = '0.5rem';
+            gridContainer.style.gap = '0.35rem';
 
             const totalCells = Math.ceil((daysInMonth + startingDayOfWeek) / 7) * 7;
 
@@ -1490,8 +1706,8 @@ class WellnessTracker {
 
                     // Add day number
                     const dayLabel = document.createElement('div');
+                    dayLabel.className = 'day-number';
                     dayLabel.textContent = dayNumber;
-                    dayLabel.style.fontWeight = 'bold';
                     dayCell.appendChild(dayLabel);
 
                     // Check if this is today
@@ -1502,16 +1718,55 @@ class WellnessTracker {
                     const dayData = history[dateStr];
 
                     if (dayData) {
-                        // Count total stars and completed tasks
-                        const totalStars = Object.values(dayData).reduce((sum, val) => {
-                            return sum + (typeof val === 'number' ? val : 0);
-                        }, 0);
+                        let totalStars = 0;
+                        let completedTasks = 0;
 
-                        const completedTasks = Object.values(dayData).filter(val =>
-                            typeof val === 'number' && val > 0
-                        ).length;
+                        // For today, use real-time data to match the top summary
+                        if (dateStr === todayDateStr) {
+                            // Use real-time calculation for today to match updateStats()
+                            for (const task of this.tasks) {
+                                const taskConfig = this.taskLevels[task];
+                                if (taskConfig && taskConfig.activities) {
+                                    let hasAnyStars = false;
+                                    let taskStars = 0;
 
-                        if (completedTasks === 3) {
+                                    // Check each activity to see if any has stars and sum up the stars
+                                    for (const activityId of Object.keys(taskConfig.activities)) {
+                                        try {
+                                            const response = await fetch(`/api/user/${this.currentUser}/task/${task}/activity/${activityId}/status`);
+                                            if (response.ok) {
+                                                const activityData = await response.json();
+                                                if (activityData.level && activityData.level > 0) {
+                                                    hasAnyStars = true;
+                                                    taskStars += activityData.level;
+                                                }
+                                            }
+                                        } catch (error) {
+                                            console.error(`Error checking activity status for ${task}/${activityId}:`, error);
+                                        }
+                                    }
+
+                                    totalStars += taskStars;
+
+                                    if (hasAnyStars) {
+                                        completedTasks++;
+                                    }
+                                }
+                            }
+                        } else {
+                            // For historical days, use cached history data (MAX level per task)
+                            this.tasks.forEach(task => {
+                                const taskLevel = dayData[task];
+                                if (typeof taskLevel === 'number') {
+                                    totalStars += taskLevel;
+                                    if (taskLevel > 0) {
+                                        completedTasks++;
+                                    }
+                                }
+                            });
+                        }
+
+                        if (completedTasks === this.tasks.length) {
                             dayCell.classList.add('completed');
                         } else if (totalStars > 0) {
                             dayCell.classList.add('partial');
@@ -1520,37 +1775,33 @@ class WellnessTracker {
                         // Show stars if there are any
                         if (totalStars > 0) {
                             const starsLabel = document.createElement('div');
-                            const starsPerRow = 3;
-                            const rows = [];
-                            for (let j = 0; j < totalStars; j += starsPerRow) {
-                                const starsInRow = Math.min(starsPerRow, totalStars - j);
-                                rows.push('⭐'.repeat(starsInRow));
-                            }
-                            starsLabel.innerHTML = rows.join('<br>');
+                            starsLabel.textContent = `${totalStars} ⭐`;
                             starsLabel.style.fontSize = '0.6rem';
                             starsLabel.style.fontWeight = 'bold';
-                            starsLabel.style.color = '#f59e0b';
+                            starsLabel.style.color = 'white';
                             starsLabel.style.marginTop = '2px';
                             starsLabel.style.textShadow = '0 1px 2px rgba(0,0,0,0.1)';
                             starsLabel.style.lineHeight = '1';
                             starsLabel.style.textAlign = 'center';
                             dayCell.appendChild(starsLabel);
                         } else {
-                            // Show empty state for days with data but no completion
+                            // Show empty star for days with data but no completion
                             const starsLabel = document.createElement('div');
-                            starsLabel.textContent = '-';
-                            starsLabel.style.fontSize = '0.6rem';
+                            starsLabel.textContent = '☆';
+                            starsLabel.style.fontSize = '0.8rem';
                             starsLabel.style.color = '#9ca3af';
                             starsLabel.style.marginTop = '2px';
+                            starsLabel.style.textAlign = 'center';
                             dayCell.appendChild(starsLabel);
                         }
                     } else {
-                        // Show empty state for days without data
+                        // Show empty star for days without data
                         const emptyLabel = document.createElement('div');
-                        emptyLabel.textContent = '-';
-                        emptyLabel.style.fontSize = '0.6rem';
+                        emptyLabel.textContent = '☆';
+                        emptyLabel.style.fontSize = '0.8rem';
                         emptyLabel.style.color = '#9ca3af';
                         emptyLabel.style.marginTop = '2px';
+                        emptyLabel.style.textAlign = 'center';
                         dayCell.appendChild(emptyLabel);
                     }
                 }
@@ -1602,6 +1853,9 @@ class WellnessTracker {
             const body = document.body;
             const themeToggle = document.getElementById('themeToggle');
 
+            // Disable auto theme when user manually toggles
+            localStorage.setItem('autoThemeDisabled', 'true');
+
             if (body.classList.contains('dark-theme')) {
                 body.classList.remove('dark-theme');
                 themeToggle.textContent = '🌙';
@@ -1625,7 +1879,25 @@ class WellnessTracker {
             const body = document.body;
             const themeToggle = document.getElementById('themeToggle');
 
-            if (savedTheme === 'dark') {
+            // Check if user has manually overridden auto theme
+            const autoThemeDisabled = localStorage.getItem('autoThemeDisabled') === 'true';
+
+            let shouldUseDarkTheme = false;
+
+            if (autoThemeDisabled) {
+                // Use saved preference if auto theme is disabled
+                shouldUseDarkTheme = savedTheme === 'dark';
+            } else {
+                // Auto theme based on time (6pm-6am = dark theme)
+                const now = new Date();
+                const hour = now.getHours();
+                shouldUseDarkTheme = hour >= 18 || hour < 6;
+
+                // Save the auto-determined theme
+                localStorage.setItem('theme', shouldUseDarkTheme ? 'dark' : 'light');
+            }
+
+            if (shouldUseDarkTheme) {
                 body.classList.add('dark-theme');
                 if (themeToggle) themeToggle.textContent = '☀️';
             } else {
@@ -1655,6 +1927,59 @@ class WellnessTracker {
         } catch (error) {
             console.error('Error updating user background:', error);
         }
+    }
+
+    /**
+     * Start automatic theme checking based on time (6pm-6am = dark theme)
+     */
+    startAutoThemeChecker() {
+        // Check theme every minute to catch hour changes
+        setInterval(() => {
+            this.checkAutoTheme();
+        }, 60000); // 60 seconds
+    }
+
+    /**
+     * Check if theme should be automatically updated based on current time
+     */
+    checkAutoTheme() {
+        try {
+            const autoThemeDisabled = localStorage.getItem('autoThemeDisabled') === 'true';
+
+            if (autoThemeDisabled) {
+                return; // Don't auto-update if user has manually overridden
+            }
+
+            const now = new Date();
+            const hour = now.getHours();
+            const shouldUseDarkTheme = hour >= 18 || hour < 6;
+
+            const body = document.body;
+            const themeToggle = document.getElementById('themeToggle');
+            const currentlyDark = body.classList.contains('dark-theme');
+
+            if (shouldUseDarkTheme && !currentlyDark) {
+                // Switch to dark theme
+                body.classList.add('dark-theme');
+                if (themeToggle) themeToggle.textContent = '☀️';
+                localStorage.setItem('theme', 'dark');
+            } else if (!shouldUseDarkTheme && currentlyDark) {
+                // Switch to light theme
+                body.classList.remove('dark-theme');
+                if (themeToggle) themeToggle.textContent = '🌙';
+                localStorage.setItem('theme', 'light');
+            }
+        } catch (error) {
+            console.error('Error in auto theme check:', error);
+        }
+    }
+
+    /**
+     * Re-enable automatic theme switching (useful for settings)
+     */
+    enableAutoTheme() {
+        localStorage.removeItem('autoThemeDisabled');
+        this.checkAutoTheme(); // Apply current time-based theme immediately
     }
 }
 

@@ -82,5 +82,19 @@ def get_user_tasks(user: str) -> List[str]:
     return list(get_user_config(user)["tasks"].keys())
 
 
+def get_user_task_activities(user: str, task: str) -> Dict:
+    """Get activities for a specific user's task"""
+    user_config = get_user_config(user)
+    task_config = user_config["tasks"].get(task, {})
+    return task_config.get("activities", {})
+
+
+def get_user_activity_levels(user: str, task: str, activity: str) -> Dict:
+    """Get levels for a specific user's task activity"""
+    activities = get_user_task_activities(user, task)
+    activity_config = activities.get(activity, {})
+    return activity_config.get("levels", {})
+
+
 # Database configuration
 DB_PATH = "data/checkins.db"

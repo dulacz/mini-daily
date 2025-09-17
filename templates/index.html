@@ -66,13 +66,10 @@
                 </div>
             </div>
             <div class="daily-stats">
-                <div class="stat-item">
-                    <span class="stat-value" id="totalStars">0</span>
-                    <span class="stat-label">Stars Today</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-value" id="completedTasks">0</span>
-                    <span class="stat-label">Tasks Done</span>
+                <div class="stat-summary">
+                    <span class="stat-number" id="totalStars">0</span><span class="stat-icon">⭐</span><span
+                        class="stat-separator"></span><span class="stat-number" id="completedTasks">0</span> <span
+                        class="stat-text">Tasks Done</span>
                 </div>
             </div>
         </section>
@@ -90,18 +87,6 @@
                     <h3 class="achievement-title" id="achievementTitle"></h3>
                     <p class="achievement-message" id="achievementMessage"></p>
                 </div>
-            </div>
-        </section>
-
-        <!-- Weekly Summary (initially hidden) -->
-        <section class="weekly-summary">
-            <button class="summary-toggle" id="summaryToggle">
-                <span>View Weekly Progress</span>
-                <span class="toggle-icon">📊</span>
-            </button>
-            <div class="summary-content" id="summaryContent" style="display: none;">
-                <h3>This Week's Progress</h3>
-                <div class="weekly-grid" id="weeklyGrid"></div>
             </div>
         </section>
 
