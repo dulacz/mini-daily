@@ -1,3 +1,5 @@
+<img width="1878" height="3297" alt="image" src="https://github.com/user-attachments/assets/f35ea070-73b2-488e-8c95-08a6d8d9ccca" />
+
 # Mini Daily - Personal Wellness Tracker
 
 A modern, lightweight web application for tracking daily wellness activities. Built with FastAPI and vanilla JavaScript, designed for personal use with no authentication required. Perfect for tracking habits across multiple users on the same network.
