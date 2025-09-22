@@ -26,7 +26,25 @@ CREATE TABLE IF NOT EXISTS checkin(
     note TEXT NOT NULL DEFAULT '',
     activity TEXT NOT NULL DEFAULT 'activity1',
     UNIQUE(d, task, user, activity)
-)
+);
+
+CREATE TABLE IF NOT EXISTS todo_questions(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    difficulty TEXT NOT NULL,
+    link TEXT NOT NULL,
+    topics TEXT NOT NULL,
+    day INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS todo_completed(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id TEXT NOT NULL,
+    user TEXT NOT NULL DEFAULT 'alice',
+    completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(question_id, user)
+);
 """
 
 
@@ -36,8 +54,47 @@ def get_conn():
 
 def init_db():
     with get_conn() as conn:
-        # Create table with new schema
-        conn.execute(DDL)
+        # Create tables with individual statements
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS checkin(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                d TEXT NOT NULL,
+                task TEXT NOT NULL,
+                level INTEGER NOT NULL DEFAULT 0,
+                user TEXT NOT NULL DEFAULT 'alice',
+                note TEXT NOT NULL DEFAULT '',
+                activity TEXT NOT NULL DEFAULT 'activity1',
+                UNIQUE(d, task, user, activity)
+            )
+        """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS todo_questions(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                question_id TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                difficulty TEXT NOT NULL,
+                link TEXT NOT NULL,
+                topics TEXT NOT NULL,
+                day INTEGER NOT NULL
+            )
+        """
+        )
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS todo_completed(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                question_id TEXT NOT NULL,
+                user TEXT NOT NULL DEFAULT 'alice',
+                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(question_id, user)
+            )
+        """
+        )
 
 
 def ensure_today_rows(user: str = DEFAULT_USER):
@@ -234,3 +291,124 @@ def get_task_activity_level(task: str, activity: str, user: str = DEFAULT_USER) 
         )
         row = cur.fetchone()
         return row[0] if row else 0
+
+
+# Todo-related functions
+def init_todo_questions():
+    """Initialize todo questions from questions.tsv file"""
+    import csv
+    from pathlib import Path
+
+    tsv_path = Path(__file__).parent.parent.parent / "data" / "questions.tsv"
+    if not tsv_path.exists():
+        print(f"Warning: questions.tsv not found at {tsv_path}")
+        return
+
+    try:
+        with get_conn() as conn:
+            # Clear existing questions
+            conn.execute("DELETE FROM todo_questions")
+
+            # Read and insert questions from TSV
+            with open(tsv_path, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f, delimiter="\t")
+                for row in reader:
+                    question_id = create_question_id(row["Problem Name"])
+                    conn.execute(
+                        """INSERT OR REPLACE INTO todo_questions 
+                           (question_id, name, difficulty, link, topics, day) 
+                           VALUES (?, ?, ?, ?, ?, ?)""",
+                        (
+                            question_id,
+                            row["Problem Name"],
+                            row["Difficulty"],
+                            row["Link"],
+                            row["Topics"],
+                            int(row["Day"]),
+                        ),
+                    )
+            print(f"Successfully initialized {conn.total_changes} todo questions")
+    except Exception as e:
+        print(f"Error initializing todo questions: {e}")
+        raise
+
+
+def create_question_id(name: str) -> str:
+    """Create a unique question ID from the problem name"""
+    import re
+
+    return re.sub(r"[^a-z0-9\s]", "", name.lower()).replace(" ", "-")
+
+
+def get_todo_questions():
+    """Get all todo questions"""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT question_id, name, difficulty, link, topics, day FROM todo_questions ORDER BY day, name"
+        )
+        return [
+            {
+                "question_id": row[0],
+                "name": row[1],
+                "difficulty": row[2],
+                "link": row[3],
+                "topics": row[4],
+                "day": row[5],
+            }
+            for row in cur.fetchall()
+        ]
+
+
+def get_completed_questions(user: str = DEFAULT_USER):
+    """Get all completed questions for a user"""
+    with get_conn() as conn:
+        cur = conn.execute("SELECT question_id FROM todo_completed WHERE user = ?", (user,))
+        return [{"question_id": row[0]} for row in cur.fetchall()]
+
+
+def toggle_question_completion(question_id: str, completed: bool, user: str = DEFAULT_USER):
+    """Toggle question completion status"""
+    with get_conn() as conn:
+        if completed:
+            # Mark as completed
+            conn.execute("INSERT OR REPLACE INTO todo_completed (question_id, user) VALUES (?, ?)", (question_id, user))
+        else:
+            # Mark as not completed
+            conn.execute("DELETE FROM todo_completed WHERE question_id = ? AND user = ?", (question_id, user))
+        return True
+
+
+def get_todo_stats(user: str = DEFAULT_USER):
+    """Get todo completion statistics"""
+    with get_conn() as conn:
+        # Get total questions
+        total_cur = conn.execute("SELECT COUNT(*) FROM todo_questions")
+        total_questions = total_cur.fetchone()[0]
+
+        # Get completed questions
+        completed_cur = conn.execute("SELECT COUNT(*) FROM todo_completed WHERE user = ?", (user,))
+        completed_questions = completed_cur.fetchone()[0]
+
+        # Get completed days
+        day_stats_cur = conn.execute(
+            """
+            SELECT tq.day, COUNT(*) as total, 
+                   COUNT(tc.question_id) as completed
+            FROM todo_questions tq
+            LEFT JOIN todo_completed tc ON tq.question_id = tc.question_id AND tc.user = ?
+            GROUP BY tq.day
+            """,
+            (user,),
+        )
+
+        completed_days = 0
+        for day, total, completed in day_stats_cur.fetchall():
+            if total > 0 and completed == total:
+                completed_days += 1
+
+        return {
+            "total_questions": total_questions,
+            "completed_questions": completed_questions,
+            "completed_days": completed_days,
+            "progress_percentage": (completed_questions / total_questions * 100) if total_questions > 0 else 0,
+        }

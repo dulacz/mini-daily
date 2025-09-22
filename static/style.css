@@ -33,23 +33,19 @@
 }
 
 .dark-theme body {
-    background: linear-gradient(to bottom, #1a1a2e 0%, #16213e 25%, #0f3460 50%, #533483 75%, #e94560 100%);
+    background: #1a1a1a !important;
     background-attachment: fixed;
     transition: background 0.8s ease;
 }
 
-/* Dark theme user-specific gradients with soft colors */
-body.dark-theme.user-alice {
-    background: linear-gradient(to bottom, #2d3748 0%, #4a5568 25%, #553c9a 50%, #805ad5 75%, #3182ce 100%);
-}
-
-body.dark-theme.user-bob {
-    background: linear-gradient(to bottom, #1a202c 0%, #2d3748 25%, #3c4e63 50%, #4a5568 75%, #553c9a 100%);
-}
-
+/* Override all user-specific gradients for todo page */
+body.dark-theme.user-alice,
+body.dark-theme.user-bob,
 body.dark-theme.user-carol {
-    background: linear-gradient(to bottom, #2d1b19 0%, #3c2e2a 25%, #4a3d35 50%, #553c4b 75%, #4a3f5c 100%);
+    background: #1a1a1a !important;
 }
+
+
 
 body.dark-theme .particle {
     background: rgba(255, 255, 255, 0.4);

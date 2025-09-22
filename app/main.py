@@ -23,6 +23,12 @@ app = FastAPI(title="Daily Check-in")
 @app.on_event("startup")
 def _startup():
     db.init_db()
+    # Initialize todo questions from TSV file
+    try:
+        db.init_todo_questions()
+    except Exception as e:
+        print(f"Warning: Failed to initialize todo questions: {e}")
+        # Continue startup even if todo initialization fails
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -352,6 +358,60 @@ async def api_history(days: int = 30):
 async def api_config():
     """Get application configuration"""
     return {"user_configs": USER_CONFIGS, "users": get_all_users(), "default_user": DEFAULT_USER}
+
+
+# Todo-related endpoints and models
+class TodoToggleRequest(BaseModel):
+    question_id: str
+    completed: bool
+
+
+@app.get("/todo", response_class=HTMLResponse)
+async def todo_page(request: Request):
+    """Render the todo.html page"""
+    return templates.TemplateResponse("todo.html", {"request": request})
+
+
+@app.get("/api/todo/questions")
+async def get_todo_questions():
+    """Get all todo questions"""
+    try:
+        # Initialize questions if empty
+        questions = db.get_todo_questions()
+        if not questions:
+            db.init_todo_questions()
+            questions = db.get_todo_questions()
+        return questions
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load questions: {str(e)}")
+
+
+@app.get("/api/todo/completed")
+async def get_completed_questions(user: str = DEFAULT_USER):
+    """Get all completed questions for a user"""
+    try:
+        return db.get_completed_questions(user)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load completed questions: {str(e)}")
+
+
+@app.post("/api/todo/toggle")
+async def toggle_question_completion(request: TodoToggleRequest, user: str = DEFAULT_USER):
+    """Toggle question completion status"""
+    try:
+        success = db.toggle_question_completion(request.question_id, request.completed, user)
+        return {"success": success}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to toggle question: {str(e)}")
+
+
+@app.get("/api/todo/stats")
+async def get_todo_stats(user: str = DEFAULT_USER):
+    """Get todo completion statistics"""
+    try:
+        return db.get_todo_stats(user)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
 
 
 @app.get("/api/users")
