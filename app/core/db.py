@@ -5,13 +5,13 @@ from datetime import date, datetime, timedelta
 import pytz
 from typing import Dict, List, Optional
 
-# Pacific timezone with DST support
-PACIFIC_TZ = pytz.timezone("America/Los_Angeles")
+# Timezone configuration
+APP_TZ = pytz.timezone("Pacific/Honolulu")
 
 
-def get_pacific_date():
-    """Get current date in Pacific Time"""
-    return datetime.now(PACIFIC_TZ).date()
+def get_current_date():
+    """Get current date in the configured timezone"""
+    return datetime.now(APP_TZ).date()
 
 
 Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
@@ -70,7 +70,7 @@ def init_db():
 def set_activity_completion(task: str, activity: str, completed: bool, date_str: Optional[str] = None):
     """Set activity completion status for a specific date"""
     if date_str is None:
-        date_str = get_pacific_date().isoformat()
+        date_str = get_current_date().isoformat()
 
     with get_conn() as conn:
         conn.execute(
@@ -85,7 +85,7 @@ def set_activity_completion(task: str, activity: str, completed: bool, date_str:
 def get_day_completions(date_str: Optional[str] = None) -> Dict[str, Dict[str, bool]]:
     """Get all activity completions for a specific date organized by task"""
     if date_str is None:
-        date_str = get_pacific_date().isoformat()
+        date_str = get_current_date().isoformat()
 
     with get_conn() as conn:
         cursor = conn.execute(
@@ -108,7 +108,7 @@ def get_day_completions(date_str: Optional[str] = None) -> Dict[str, Dict[str, b
 def get_last_completion_dates(exclude_date: Optional[str] = None) -> Dict[str, Dict[str, str]]:
     """Get the last completion date for each activity (excluding a specific date, typically today)"""
     if exclude_date is None:
-        exclude_date = get_pacific_date().isoformat()
+        exclude_date = get_current_date().isoformat()
 
     with get_conn() as conn:
         cursor = conn.execute(
@@ -132,7 +132,7 @@ def get_last_completion_dates(exclude_date: Optional[str] = None) -> Dict[str, D
 
 def get_history(days: int = 30) -> Dict[str, Dict[str, int]]:
     """Get completion history for the last N days"""
-    cutoff = (get_pacific_date() - timedelta(days=days - 1)).isoformat()
+    cutoff = (get_current_date() - timedelta(days=days - 1)).isoformat()
 
     with get_conn() as conn:
         cursor = conn.execute(
@@ -155,7 +155,7 @@ def get_history(days: int = 30) -> Dict[str, Dict[str, int]]:
 
 def get_streak() -> int:
     """Calculate current streak of days with any completed activities"""
-    today = get_pacific_date()
+    today = get_current_date()
     streak = 0
 
     with get_conn() as conn:
@@ -181,7 +181,7 @@ def get_streak() -> int:
 
 def get_total_completions(days: int = 365) -> int:
     """Get total number of completed activities in the last N days"""
-    cutoff = (get_pacific_date() - timedelta(days=days - 1)).isoformat()
+    cutoff = (get_current_date() - timedelta(days=days - 1)).isoformat()
 
     with get_conn() as conn:
         cursor = conn.execute(

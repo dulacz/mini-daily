@@ -201,21 +201,10 @@ function todoApp() {
             }
         },
 
-        // Particles animation
+        // Particles animation - uses shared utility function
         createParticles() {
             const particlesContainer = this.$refs.particles;
-            if (!particlesContainer) return;
-
-            particlesContainer.innerHTML = '';
-
-            for (let i = 0; i < 30; i++) {
-                const particle = document.createElement('div');
-                particle.className = 'particle';
-                particle.style.left = Math.random() * 100 + '%';
-                particle.style.animationDelay = Math.random() * 20 + 's';
-                particle.style.animationDuration = (Math.random() * 10 + 15) + 's';
-                particlesContainer.appendChild(particle);
-            }
+            window.createParticles(particlesContainer, 30);
         }
     }
 }

@@ -282,7 +282,6 @@
     0% {
         transform: rotate(0deg);
     }
-
     100% {
         transform: rotate(360deg);
     }
@@ -311,55 +310,11 @@
 }
 
 .retry-button:hover {
-    background: var(--accent-hover);
-}
-
-/* Progress summary adjustments for todo page */
-.progress-summary {
-    display: flex;
-    gap: 4rem;
-    align-items: center;
-}
-
-.progress-item {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.progress-icon {
-    font-size: 1.25rem;
-}
-
-.progress-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.5;
-    gap: 0.5rem;
-    min-height: 3rem;
-    justify-content: center;
-}
-
-.progress-number {
-    font-weight: 700;
-    font-size: 1.125rem;
-    color: var(--text-primary);
-}
-
-.progress-label {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    font-weight: 500;
-    letter-spacing: 0.025em;
+    background: var(--secondary-color);
 }
 
 /* Responsive design */
 @media (max-width: 768px) {
-    .progress-summary {
-        gap: 1rem;
-    }
-
     .question-item {
         padding: 0.75rem 1rem;
         gap: 0.75rem;

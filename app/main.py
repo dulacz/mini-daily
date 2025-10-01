@@ -40,7 +40,7 @@ class TodoToggleRequest(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    today = date.today().isoformat()
+    today = db.get_current_date().isoformat()
     return templates.TemplateResponse("index.html", {"request": request, "today": today})
 
 
@@ -62,7 +62,7 @@ async def get_day_completions(date_str: Optional[str] = None):
         completions = db.get_day_completions(date_str)
         last_completions = db.get_last_completion_dates(date_str)
         return {
-            "date": date_str or date.today().isoformat(),
+            "date": date_str or db.get_current_date().isoformat(),
             "completions": completions,
             "last_completions": last_completions,
         }
