@@ -74,68 +74,29 @@
 
         <!-- Main Content -->
         <section class="main-content" x-show="!loading && !error">
-            <!-- Knowledge Task Box -->
-            <div class="task-card">
-                <div class="task-header">
-                    <h3 class="task-title">💪 运动减肥</h3>
-                    <div class="task-stats">
-                        <span class="star-icon">⭐</span>
-                        <span class="star-number" x-text="getTaskCompletedCount('fitness')"></span>
-                        <span class="star-label">/ 9</span>
+            <!-- Dynamic Task Cards from Config -->
+            <template x-for="taskId in taskIds" :key="taskId">
+                <div class="task-card">
+                    <div class="task-header">
+                        <h3 class="task-title" x-text="getTaskTitle(taskId)"></h3>
+                        <div class="task-stats">
+                            <span class="star-icon">⭐</span>
+                            <span class="star-number" x-text="getTaskCompletedCount(taskId)"></span>
+                            <span class="star-label" x-text="'/ ' + getTaskActivityCount(taskId)"></span>
+                        </div>
+                    </div>
+                    <div class="activity-grid">
+                        <template x-for="activity in getTaskActivities(taskId)" :key="activity.key">
+                            <button class="activity-btn-grid" :class="{ 'active': activity.completed }"
+                                @click="toggleActivity(activity.task, activity.activity)">
+                                <div class="activity-label" x-text="activity.label"></div>
+                                <div class="activity-last-completed" x-text="getTimeAgo(activity.lastCompletedDate)">
+                                </div>
+                            </button>
+                        </template>
                     </div>
                 </div>
-                <div class="activity-grid">
-                    <template x-for="activity in getTaskActivities('fitness')" :key="activity.key">
-                        <button class="activity-btn-grid" :class="{ 'active': activity.completed }"
-                            @click="toggleActivity(activity.task, activity.activity)">
-                            <div class="activity-label" x-text="activity.label"></div>
-                            <div class="activity-last-completed" x-text="getTimeAgo(activity.lastCompletedDate)"></div>
-                        </button>
-                    </template>
-                </div>
-            </div>
-
-            <!-- Fitness Task Box -->
-            <div class="task-card">
-                <div class="task-header">
-                    <h3 class="task-title">❤️ 家庭社会</h3>
-                    <div class="task-stats">
-                        <span class="star-icon">⭐</span>
-                        <span class="star-number" x-text="getTaskCompletedCount('duty')"></span>
-                        <span class="star-label">/ 9</span>
-                    </div>
-                </div>
-                <div class="activity-grid">
-                    <template x-for="activity in getTaskActivities('duty')" :key="activity.key">
-                        <button class="activity-btn-grid" :class="{ 'active': activity.completed }"
-                            @click="toggleActivity(activity.task, activity.activity)">
-                            <div class="activity-label" x-text="activity.label"></div>
-                            <div class="activity-last-completed" x-text="getTimeAgo(activity.lastCompletedDate)"></div>
-                        </button>
-                    </template>
-                </div>
-            </div>
-
-            <!-- Creativity Task Box -->
-            <div class="task-card">
-                <div class="task-header">
-                    <h3 class="task-title">😎 定义自己</h3>
-                    <div class="task-stats">
-                        <span class="star-icon">⭐</span>
-                        <span class="star-number" x-text="getTaskCompletedCount('meaning')"></span>
-                        <span class="star-label">/ 9</span>
-                    </div>
-                </div>
-                <div class="activity-grid">
-                    <template x-for="activity in getTaskActivities('meaning')" :key="activity.key">
-                        <button class="activity-btn-grid" :class="{ 'active': activity.completed }"
-                            @click="toggleActivity(activity.task, activity.activity)">
-                            <div class="activity-label" x-text="activity.label"></div>
-                            <div class="activity-last-completed" x-text="getTimeAgo(activity.lastCompletedDate)"></div>
-                        </button>
-                    </template>
-                </div>
-            </div>
+            </template>
         </section>
 
         <!-- Historical Calendar -->
@@ -157,6 +118,7 @@
                 // Core state
                 activities: [],
                 config: null,
+                taskIds: [],
                 loading: true,
                 error: null,
 
@@ -190,6 +152,9 @@
 
                     const data = await response.json();
                     this.config = data.user_configs.alice;
+
+                    // Store task IDs in order
+                    this.taskIds = Object.keys(this.config.tasks);
 
                     // Build activities array
                     this.activities = [];
@@ -337,9 +302,9 @@
                                 }
 
                                 let levelClass = 'level-0';
-                                if (totalCompleted >= 20) levelClass = 'level-3';
-                                else if (totalCompleted >= 10) levelClass = 'level-2';
-                                else if (totalCompleted >= 5) levelClass = 'level-1';
+                                if (totalCompleted >= 3) levelClass = 'level-3';
+                                else if (totalCompleted >= 2) levelClass = 'level-2';
+                                else if (totalCompleted >= 1) levelClass = 'level-1';
 
                                 const isToday = dateStr === todayDateStr ? 'today' : '';
 
@@ -393,6 +358,18 @@
 
                 getTaskCompletedCount(taskId) {
                     return this.activities.filter(a => a.task === taskId && a.completed).length;
+                },
+
+                getTaskActivityCount(taskId) {
+                    return this.activities.filter(a => a.task === taskId).length;
+                },
+
+                getTaskTitle(taskId) {
+                    if (!this.config || !this.config.tasks[taskId]) return taskId;
+                    const task = this.config.tasks[taskId];
+                    const icon = task.icon || '';
+                    const title = task.title || taskId;
+                    return icon ? `${icon} ${title}` : title;
                 },
 
                 get completedToday() {
