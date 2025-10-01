@@ -346,6 +346,14 @@ body.user-carol {
     font-size: 0.875rem;
 }
 
+.activity-btn-grid .activity-last-completed {
+    font-size: 0.7rem;
+    opacity: 0.6;
+    margin-top: 0.375rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.7);
+}
+
 .activity-btn-grid .activity-task {
     font-size: 0.75rem;
     opacity: 0.7;

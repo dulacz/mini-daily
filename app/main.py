@@ -60,7 +60,12 @@ async def get_day_completions(date_str: Optional[str] = None):
     """Get all activity completions for a specific date"""
     try:
         completions = db.get_day_completions(date_str)
-        return {"date": date_str or date.today().isoformat(), "completions": completions}
+        last_completions = db.get_last_completion_dates(date_str)
+        return {
+            "date": date_str or date.today().isoformat(),
+            "completions": completions,
+            "last_completions": last_completions,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting day completions: {str(e)}")
 

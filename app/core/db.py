@@ -105,6 +105,31 @@ def get_day_completions(date_str: Optional[str] = None) -> Dict[str, Dict[str, b
         return result
 
 
+def get_last_completion_dates(exclude_date: Optional[str] = None) -> Dict[str, Dict[str, str]]:
+    """Get the last completion date for each activity (excluding a specific date, typically today)"""
+    if exclude_date is None:
+        exclude_date = get_pacific_date().isoformat()
+
+    with get_conn() as conn:
+        cursor = conn.execute(
+            """
+            SELECT task, activity, MAX(date) as last_date
+            FROM activity_completions 
+            WHERE completed = 1 AND date < ?
+            GROUP BY task, activity
+        """,
+            (exclude_date,),
+        )
+
+        result = {}
+        for task, activity, last_date in cursor.fetchall():
+            if task not in result:
+                result[task] = {}
+            result[task][activity] = last_date
+
+        return result
+
+
 def get_history(days: int = 30) -> Dict[str, Dict[str, int]]:
     """Get completion history for the last N days"""
     cutoff = (get_pacific_date() - timedelta(days=days - 1)).isoformat()
