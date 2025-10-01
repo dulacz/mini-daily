@@ -1,0 +1,70 @@
+tasks:
+  knowledge:
+    title: "Knowledge"
+    description: "Feed your mind with knowledge"
+    icon: "📚"
+    activities:
+      reading:
+        label: "Reading Books"
+      podcasts:
+        label: "Listening to Podcasts"
+      documentary:
+        label: "Watching Documentary"
+      articles:
+        label: "Reading Articles"
+      audiobooks:
+        label: "Listening to Audiobooks"
+      courses:
+        label: "Online Learning"
+      research:
+        label: "Research & Study"
+      news:
+        label: "Reading News"
+      journals:
+        label: "Reading Journals"
+  fitness:
+    title: "Fitness"
+    description: "Stay strong and healthy"
+    icon: "💪"
+    activities:
+      walking:
+        label: "Walking"
+      running:
+        label: "Running"
+      cycling:
+        label: "Cycling"
+      swimming:
+        label: "Swimming"
+      weightlifting:
+        label: "Weight Training"
+      yoga:
+        label: "Yoga"
+      stretching:
+        label: "Stretching"
+      sports:
+        label: "Playing Sports"
+      hiking:
+        label: "Hiking"
+  creativity:
+    title: "Creative Work"
+    description: "Express your creativity"
+    icon: "🎨"
+    activities:
+      drawing:
+        label: "Drawing"
+      painting:
+        label: "Painting"
+      writing:
+        label: "Creative Writing"
+      music:
+        label: "Playing Music"
+      photography:
+        label: "Photography"
+      crafting:
+        label: "Crafting"
+      cooking:
+        label: "Creative Cooking"
+      design:
+        label: "Digital Design"
+      dancing:
+        label: "Dancing"

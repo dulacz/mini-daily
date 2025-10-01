@@ -12,19 +12,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="{{ url_for('static', path='todo-app.js') }}"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 
-<body x-data="todoApp()" x-init="init()" :class="isDarkTheme ? 'dark-theme' : ''" <!-- Animated Background Particles -->
+<body x-data="todoApp()" x-init="init()" class="dark-theme">
+    <!-- Animated Background Particles -->
     <div class="particles" x-ref="particles"></div>
-
-    <!-- Theme Toggle -->
-    <div class="theme-toggle" @click="toggleTheme()"
-        :title="isDarkTheme ? 'Switch to light mode' : 'Switch to dark mode'">
-        <span x-show="isDarkTheme">☀️</span>
-        <span x-show="!isDarkTheme">🌙</span>
-    </div>
 
     <!-- Navigation -->
     <nav class="navigation">
@@ -40,34 +34,6 @@
     </nav>
 
     <div class="app-container">
-        <!-- Header Section -->
-        <header class="header">
-            <div class="header-content">
-                <h1 class="app-title">Daily Practice</h1>
-                <div class="streak-counter">
-                    <span class="streak-icon">✅</span>
-                    <span class="streak-text">
-                        <span class="streak-number" x-text="totalCompleted"></span>
-                        <span class="streak-label">completed</span>
-                    </span>
-                </div>
-                <div class="star-counter">
-                    <span class="star-icon">📋</span>
-                    <span class="star-text">
-                        <span class="star-number" x-text="totalQuestions"></span>
-                        <span class="star-label">total</span>
-                    </span>
-                </div>
-                <div class="star-counter" style="margin-left: 1rem;">
-                    <span class="star-icon">🔥</span>
-                    <span class="star-text">
-                        <span class="star-number" x-text="completedDays"></span>
-                        <span class="star-label">days done</span>
-                    </span>
-                </div>
-            </div>
-        </header>
-
         <!-- Main Content - Day Groups -->
         <main class="days-container">
             <template x-for="day in sortedDays" :key="day.dayNumber">

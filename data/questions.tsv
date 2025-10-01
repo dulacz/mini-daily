@@ -1,0 +1,168 @@
+Problem Name	Difficulty	Link	Topics	Day
+Reverse String	Easy	https://leetcode.com/problems/reverse-string/	"Two Pointers, String, Recursion"	1
+Binary Tree Inorder Traversal	Easy	https://leetcode.com/problems/binary-tree-inorder-traversal/	"Stack, Tree, Depth-First Search (DFS), Binary Tree"	1
+Fizz Buzz	Easy	https://leetcode.com/problems/fizz-buzz/	"Math, String"	1
+Best Time to Buy and Sell Stock II	Easy	https://leetcode.com/problems/best-time-to-buy-and-sell-stock-ii/	"Array, Greedy"	1
+Excel Sheet Column Number	Easy	https://leetcode.com/problems/excel-sheet-column-number/	"Math, String"	1
+Pascal's Triangle	Easy	https://leetcode.com/problems/pascals-triangle/	"Array, Dynamic Programming"	1
+First Unique Character in a String	Easy	https://leetcode.com/problems/first-unique-character-in-a-string/	"Hash Table, String, Queue, Counting"	1
+Intersection of Two Arrays II	Easy	https://leetcode.com/problems/intersection-of-two-arrays-ii/	"Array, Hash Table, Two Pointers, Binary Search, Sorting"	1
+Happy Number	Easy	https://leetcode.com/problems/happy-number/	"Hash Table, Math, Two Pointers"	1
+Remove Duplicates from Sorted Array	Easy	https://leetcode.com/problems/remove-duplicates-from-sorted-array/	"Array, Two Pointers"	1
+Intersection of Two Linked Lists	Easy	https://leetcode.com/problems/intersection-of-two-linked-lists/	"Hash Table, Linked List, Two Pointers"	2
+Plus One	Easy	https://leetcode.com/problems/plus-one/	"Array, Math"	2
+Merge Sorted Array	Easy	https://leetcode.com/problems/merge-sorted-array/	"Array, Two Pointers, Sorting"	2
+Find the Index of the First Occurrence in a String	Easy	https://leetcode.com/problems/find-the-index-of-the-first-occurrence-in-a-string/	"Two Pointers, String, String Matching"	2
+Missing Ranges	Easy	https://leetcode.com/problems/missing-ranges/	Array	2
+High Five	Easy	https://leetcode.com/problems/high-five/	"Array, HashMap, Sorting"	2
+Logger Rate Limiter	Easy	https://leetcode.com/problems/logger-rate-limiter/	"HashMap, Design, Queue"	2
+Read N Characters Given Read4	Easy	https://leetcode.com/problems/read-n-characters-given-read4/	"String, Two Pointers"	2
+Minimum Difference Between Highest and Lowest of K Scores	Easy	https://leetcode.com/problems/minimum-difference-between-highest-and-lowest-of-k-scores/	"Array, Sorting, Sliding Window"	2
+Implement Stack using Queues	Easy	https://leetcode.com/problems/implement-stack-using-queues/	"Stack, Design, Queue"	2
+Moving Average from Data Stream	Easy	https://leetcode.com/problems/moving-average-from-data-stream/	"Array, Design, Queue, Data Stream"	3
+Closest Binary Search Tree Value	Easy	https://leetcode.com/problems/closest-binary-search-tree-value/	"Tree, Depth-First Search (DFS), Binary Search Tree"	3
+Search in a Binary Search Tree	Easy	https://leetcode.com/problems/search-in-a-binary-search-tree/	"Tree, Binary Search Tree"	3
+Kth Largest Element in a Stream	Easy	https://leetcode.com/problems/kth-largest-element-in-a-stream/	"Tree, Design, Heap (Priority Queue), Data Stream"	3
+Valid Palindrome II	Easy	https://leetcode.com/problems/valid-palindrome-ii/	"String, Two Pointers"	3
+Range Sum of BST	Easy	https://leetcode.com/problems/range-sum-of-bst/	"Tree, DFS, Binary Search Tree"	3
+Delete Node in a Linked List	Medium	https://leetcode.com/problems/delete-node-in-a-linked-list/	Linked List	3
+Factorial Trailing Zeroes	Medium	https://leetcode.com/problems/factorial-trailing-zeroes/	Math	3
+Count Primes	Medium	https://leetcode.com/problems/count-primes/	"Array, Math, Enumeration"	4
+Top K Frequent Elements	Medium	https://leetcode.com/problems/top-k-frequent-elements/	"Array, HashMap, Divide and Conquer, Sorting, Heap (Priority Queue), Bucket Sort"	4
+Game of Life	Medium	https://leetcode.com/problems/game-of-life/	"Array, Matrix, Simulation"	4
+Kth Smallest Element in a Sorted Matrix	Medium	https://leetcode.com/problems/kth-smallest-element-in-a-sorted-matrix/	"Array, Binary Search, Sorting, Heap (Priority Queue), Matrix"	4
+Flatten Nested List Iterator	Medium	https://leetcode.com/problems/flatten-nested-list-iterator/	"Stack, Design, Queue, Iterator"	4
+4Sum II	Medium	https://leetcode.com/problems/4sum-ii/	"Array, HashMap"	5
+Shuffle an Array	Medium	https://leetcode.com/problems/shuffle-an-array/	"Array, Math, Randomized"	5
+Palindrome Partitioning	Medium	https://leetcode.com/problems/palindrome-partitioning/	"Array, String, Backtracking"	5
+Diagonal Traverse	Medium	https://leetcode.com/problems/diagonal-traverse/	"Array, Matrix"	5
+Find and Replace Pattern	Medium	https://leetcode.com/problems/find-and-replace-pattern/	"Array, HashMap, String"	5
+Sum of Two Integers	Medium	https://leetcode.com/problems/sum-of-two-integers/	"Math, Bit Manipulation"	6
+Populating Next Right Pointers in Each Node	Medium	https://leetcode.com/problems/populating-next-right-pointers-in-each-node/	"Tree, Depth-First Search (DFS), Breadth-First Search (BFS), Binary Tree"	6
+Perfect Squares	Medium	https://leetcode.com/problems/perfect-squares/	"Math, Dynamic Programming, Breadth-First Search (BFS)"	6
+Search a 2D Matrix II	Medium	https://leetcode.com/problems/search-a-2d-matrix-ii/	"Array, Binary Search, Divide and Conquer, Matrix"	6
+Find Peak Element	Medium	https://leetcode.com/problems/find-peak-element/	"Array, Binary Search"	6
+Longest Substring with At Least K Repeating Characters	Medium	https://leetcode.com/problems/longest-substring-with-at-least-k-repeating-characters/	"HashMap, String, Divide and Conquer, Sliding Window, Recursion"	7
+House Robber II	Medium	https://leetcode.com/problems/house-robber-ii/	"Array, Dynamic Programming"	7
+Copy List with Random Pointer	Medium	https://leetcode.com/problems/copy-list-with-random-pointer/	"HashMap, Linked List"	7
+Increasing Triplet Subsequence	Medium	https://leetcode.com/problems/increasing-triplet-subsequence/	"Array, Greedy"	7
+Find First and Last Position of Element in Sorted Array	Medium	https://leetcode.com/problems/find-first-and-last-position-of-element-in-sorted-array/	"Array, Binary Search"	7
+Design Tic-Tac-Toe	Medium	https://leetcode.com/problems/design-tic-tac-toe/	"Array, HashMap, Design, Matrix"	8
+Flatten 2D Vector	Medium	https://leetcode.com/problems/flatten-2d-vector/	"Array, Design, Iterator"	8
+Longest Substring with At Most K Distinct Characters	Medium	https://leetcode.com/problems/longest-substring-with-at-most-k-distinct-characters/	"HashMap, String, Sliding Window"	8
+Find the Celebrity	Medium	https://leetcode.com/problems/find-the-celebrity/	"Array, Two Pointers, Graph, Interactive"	8
+Robot Bounded In Circle	Medium	https://leetcode.com/problems/robot-bounded-in-circle/	"Math, String, Simulation"	8
+Analyze User Website Visit Pattern	Medium	https://leetcode.com/problems/analyze-user-website-visit-pattern/	"Array, HashMap, Sorting"	9
+Shortest Word Distance II	Medium	https://leetcode.com/problems/shortest-word-distance-ii/	"Array, HashMap, Two Pointers, Design"	9
+Leftmost Column with at Least a One	Medium	https://leetcode.com/problems/leftmost-column-with-at-least-a-one/	"Array, Binary Search, Matrix"	9
+Dot Product of Two Sparse Vectors	Medium	https://leetcode.com/problems/dot-product-of-two-sparse-vectors/	"Array, HashMap, Two Pointers, Design"	9
+Nested List Weight Sum II	Medium	https://leetcode.com/problems/nested-list-weight-sum-ii/	"Depth-First Search (DFS), Breadth-First Search (BFS), Queue"	9
+Lowest Common Ancestor of a Binary Tree III	Medium	https://leetcode.com/problems/lowest-common-ancestor-of-a-binary-tree-iii/	"Tree, Depth-First Search (DFS), Binary Tree"	10
+Convert Binary Search Tree to Sorted Doubly Linked List	Medium	https://leetcode.com/problems/convert-binary-search-tree-to-sorted-doubly-linked-list/	"Linked List, Depth-First Search (DFS), Binary Search Tree, Doubly-Linked List"	10
+Line Reflection	Medium	https://leetcode.com/problems/line-reflection/	"Array, HashSet, Math"	10
+Buildings With an Ocean View	Medium	https://leetcode.com/problems/buildings-with-an-ocean-view/	"Array, Stack, Monotonic Stack"	10
+Nested List Weight Sum	Medium	https://leetcode.com/problems/nested-list-weight-sum/	"Depth-First Search (DFS), Breadth-First Search (BFS), Stack"	10
+Binary Tree Vertical Order Traversal	Medium	https://leetcode.com/problems/binary-tree-vertical-order-traversal/	"HashMap, Tree, Depth-First Search (DFS), Breadth-First Search (BFS), Binary Tree"	11
+Minimum Cost to Connect Sticks	Medium	https://leetcode.com/problems/minimum-cost-to-connect-sticks/	"Array, Greedy, Sorting, Heap (Priority Queue)"	11
+Reverse Linked List II	Medium	https://leetcode.com/problems/reverse-linked-list-ii/	Linked List	11
+Find the Kth Largest Integer in the Array	Medium	https://leetcode.com/problems/find-the-kth-largest-integer-in-the-array/	"Array, String, Sorting, Heap (Priority Queue)"	11
+Zigzag Iterator	Medium	https://leetcode.com/problems/zigzag-iterator/	"Array, Design, Queue, Iterator"	11
+First Unique Number	Medium	https://leetcode.com/problems/first-unique-number/	"Array, HashMap, Design, Queue, Data Stream"	12
+Design Browser History	Medium	https://leetcode.com/problems/design-browser-history/	"Array, Linked List, Stack, Design, Doubly-Linked List"	12
+Remove All Adjacent Duplicates in String II	Medium	https://leetcode.com/problems/remove-all-adjacent-duplicates-in-string-ii/	"String, Stack"	12
+Minimum Remove to Make Valid Parentheses	Medium	https://leetcode.com/problems/minimum-remove-to-make-valid-parentheses/	"String, Stack"	12
+Bulls and Cows	Medium	https://leetcode.com/problems/bulls-and-cows/	"HashMap, String, Counting"	12
+Ugly Number II	Medium	https://leetcode.com/problems/ugly-number-ii/	"HashMap, Math, Dynamic Programming, Heap (Priority Queue)"	13
+Reorganize String	Medium	https://leetcode.com/problems/reorganize-string/	"HashMap, String, Greedy, Sorting, Heap (Priority Queue)"	13
+Longest Continuous Subarray With Absolute Diff Less Than or Equal to Limit	Medium	https://leetcode.com/problems/longest-continuous-subarray-with-absolute-diff-less-than-or-equal-to-limit/	"Array, Sliding Window, Ordered Set"	13
+Single Element in a Sorted Array	Medium	https://leetcode.com/problems/single-element-in-a-sorted-array/	"Array, Binary Search"	13
+Sum of Mutated Array Closest to Target	Medium	https://leetcode.com/problems/sum-of-mutated-array-closest-to-target/	"Array, Binary Search"	13
+Missing Element in Sorted Array	Medium	https://leetcode.com/problems/missing-element-in-sorted-array/	"Array, Binary Search"	14
+Longest Repeating Substring	Medium	https://leetcode.com/problems/longest-repeating-substring/	"String, Binary Search, Dynamic Programming, Sliding Window, Rolling Hash"	14
+Cutting Ribbons	Medium	https://leetcode.com/problems/cutting-ribbons/	"Array, Binary Search"	14
+Two Sum II - Input Array Is Sorted	Medium	https://leetcode.com/problems/two-sum-ii-input-array-is-sorted/	"Array, Two Pointers, Binary Search"	14
+4Sum	Medium	https://leetcode.com/problems/4sum/	"Array, Two Pointers, Sorting"	14
+The Maze	Medium	https://leetcode.com/problems/the-maze/	"Depth-First Search (DFS), Breadth-First Search (BFS), Graph"	15
+Surrounded Regions	Medium	https://leetcode.com/problems/surrounded-regions/	"Array, Depth-First Search (DFS), Breadth-First Search (BFS), Union Find, Matrix"	15
+Open the Lock	Medium	https://leetcode.com/problems/open-the-lock/	"Array, HashMap, Breadth-First Search (BFS)"	15
+Shortest Path in Binary Matrix	Medium	https://leetcode.com/problems/shortest-path-in-binary-matrix/	"Array, Breadth-First Search (BFS), Matrix"	15
+Sequence Reconstruction	Medium	https://leetcode.com/problems/sequence-reconstruction/	"Array, Graph, Topological Sort"	15
+Flip Equivalent Binary Trees	Medium	https://leetcode.com/problems/flip-equivalent-binary-trees/	"Tree, Depth-First Search (DFS), Binary Tree"	16
+Clone Binary Tree With Random Pointer	Medium	https://leetcode.com/problems/clone-binary-tree-with-random-pointer/	"Tree, Depth-First Search (DFS), Breadth-First Search (BFS), Binary Tree"	16
+Delete Nodes And Return Forest	Medium	https://leetcode.com/problems/delete-nodes-and-return-forest/	"Tree, Depth-First Search (DFS), Binary Tree"	16
+Trim a Binary Search Tree	Medium	https://leetcode.com/problems/trim-a-binary-search-tree/	"Tree, Depth-First Search (DFS), Binary Search Tree"	16
+Largest BST Subtree	Medium	https://leetcode.com/problems/largest-bst-subtree/	"Tree, Depth-First Search (DFS), Binary Search Tree"	16
+Inorder Successor in BST II	Medium	https://leetcode.com/problems/inorder-successor-in-bst-ii/	"Tree, Depth-First Search (DFS)"	17
+Restore IP Addresses	Medium	https://leetcode.com/problems/restore-ip-addresses/	"String, Backtracking"	17
+Score of Parentheses	Medium	https://leetcode.com/problems/score-of-parentheses/	"String, Stack"	17
+Brace Expansion	Medium	https://leetcode.com/problems/brace-expansion/	"String, Backtracking"	17
+Evaluate Division	Medium	https://leetcode.com/problems/evaluate-division/	"Array, Depth-First Search (DFS), Breadth-First Search (BFS), Union Find, Graph"	17
+Time Needed to Inform All Employees	Medium	https://leetcode.com/problems/time-needed-to-inform-all-employees/	"Depth-First Search (DFS), Breadth-First Search (BFS), Tree"	18
+Number of Distinct Islands	Medium	https://leetcode.com/problems/number-of-distinct-islands/	"Array, Depth-First Search (DFS), Breadth-First Search (BFS), Union Find"	18
+Combination Sum II	Medium	https://leetcode.com/problems/combination-sum-ii/	"Array, Backtracking"	18
+Combination Sum III	Medium	https://leetcode.com/problems/combination-sum-iii/	"Array, Backtracking"	18
+Subsets II	Medium	https://leetcode.com/problems/subsets-ii/	"Array, Backtracking"	18
+Permutations II	Medium	https://leetcode.com/problems/permutations-ii/	"Array, Backtracking"	19
+Combinations	Medium	https://leetcode.com/problems/combinations/	"Array, Backtracking"	19
+Partition to K Equal Sum Subsets	Medium	https://leetcode.com/problems/partition-to-k-equal-sum-subsets/	"Array, Dynamic Programming, Backtracking, Bit Manipulation, Memoization"	19
+Beautiful Arrangement	Medium	https://leetcode.com/problems/beautiful-arrangement/	"Dynamic Programming, Backtracking, Bit Manipulation"	19
+Maximum Points You Can Obtain from Cards	Medium	https://leetcode.com/problems/maximum-points-you-can-obtain-from-cards/	"Array, Prefix Sum, Sliding Window"	19
+Maximum Sum of Two Non-Overlapping Subarrays	Medium	https://leetcode.com/problems/maximum-sum-of-two-non-overlapping-subarrays/	"Array, Dynamic Programming, Prefix Sum"	20
+Range Sum Query 2D - Immutable	Medium	https://leetcode.com/problems/range-sum-query-2d-immutable/	"Array, Design, Matrix, Prefix Sum"	20
+Continuous Subarray Sum	Medium	https://leetcode.com/problems/continuous-subarray-sum/	"Array, HashMap, Prefix Sum"	20
+Number of Provinces	Medium	https://leetcode.com/problems/number-of-provinces/	"Depth-First Search (DFS), Breadth-First Search (BFS), Union Find, Graph"	20
+Sentence Similarity II	Medium	https://leetcode.com/problems/sentence-similarity-ii/	"Array, HashMap, Depth-First Search (DFS), Breadth-First Search (BFS), Union Find"	20
+Search Suggestions System	Medium	https://leetcode.com/problems/search-suggestions-system/	"Array, String, Trie, Sorting"	21
+Sum of Subarray Minimums	Medium	https://leetcode.com/problems/sum-of-subarray-minimums/	"Array, Stack, Monotonic Stack"	21
+Online Stock Span	Medium	https://leetcode.com/problems/online-stock-span/	"Stack, Design, Monotonic Stack"	21
+Next Greater Element II	Medium	https://leetcode.com/problems/next-greater-element-ii/	"Array, Stack, Monotonic Stack"	21
+My Calendar I	Medium	https://leetcode.com/problems/my-calendar-i/	"Array, Binary Search, Design"	21
+Hand of Straights	Medium	https://leetcode.com/problems/hand-of-straights/	"Array, HashMap, Greedy, Sorting"	22
+Longest Continuous Increasing Subsequence	Medium	https://leetcode.com/problems/longest-continuous-increasing-subsequence/	"Array, Dynamic Programming"	22
+Minimum Path Sum	Medium	https://leetcode.com/problems/minimum-path-sum/	"Array, Dynamic Programming, Matrix"	22
+Largest Divisible Subset	Medium	https://leetcode.com/problems/largest-divisible-subset/	"Array, Math, Dynamic Programming"	22
+Paint House	Medium	https://leetcode.com/problems/paint-house/	"Array, Dynamic Programming"	22
+Jump Game II	Medium	https://leetcode.com/problems/jump-game-ii/	"Array, Dynamic Programming, Greedy"	23
+Longest Common Subsequence	Medium	https://leetcode.com/problems/longest-common-subsequence/	"String, Dynamic Programming"	23
+Minimum ASCII Delete Sum for Two Strings	Medium	https://leetcode.com/problems/minimum-ascii-delete-sum-for-two-strings/	"String, Dynamic Programming"	23
+Count Square Submatrices with All Ones	Medium	https://leetcode.com/problems/count-square-submatrices-with-all-ones/	"Array, Dynamic Programming, Matrix"	23
+Delete and Earn	Medium	https://leetcode.com/problems/delete-and-earn/	"Array, HashMap, Dynamic Programming"	23
+Coin Change II	Medium	https://leetcode.com/problems/coin-change-ii/	"Array, Dynamic Programming"	24
+Longest String Chain	Medium	https://leetcode.com/problems/longest-string-chain/	"Array, HashMap, Dynamic Programming"	24
+Partition Array for Maximum Sum	Medium	https://leetcode.com/problems/partition-array-for-maximum-sum/	"Array, Dynamic Programming"	24
+Stone Game II	Medium	https://leetcode.com/problems/stone-game-ii/	"Array, Math, Dynamic Programming, Game Theory"	24
+Design Snake Game	Medium	https://leetcode.com/problems/design-snake-game/	"Design, Queue, Matrix"	24
+Average Waiting Time	Medium	https://leetcode.com/problems/average-waiting-time/	"Array, Simulation"	25
+Minimum Add to Make Parentheses Valid	Medium	https://leetcode.com/problems/minimum-add-to-make-parentheses-valid/	"String, Stack"	25
+Range Sum Query 2D - Mutable	Hard	https://leetcode.com/problems/range-sum-query-2d-mutable/	"Binary Indexed Tree, Segment Tree, Design, Matrix"	25
+Max Stack	Hard	https://leetcode.com/problems/max-stack/	"Stack, Design, Doubly-Linked List"	25
+Web Crawler Multithreaded	Hard	https://leetcode.com/problems/web-crawler-multithreaded/	"HashMap, Depth-First Search (DFS), Breadth-First Search (BFS), String, Design, Multithreading"	26
+Basic Calculator III	Hard	https://leetcode.com/problems/basic-calculator-iii/	"Math, String, Stack"	26
+Find in Mountain Array	Hard	https://leetcode.com/problems/find-in-mountain-array/	"Array, Binary Search"	26
+Maximum Average Subarray II	Hard	https://leetcode.com/problems/maximum-average-subarray-ii/	"Array, Binary Search, Sliding Window"	27
+Shortest Path in a Grid with Obstacles Elimination	Hard	https://leetcode.com/problems/shortest-path-in-a-grid-with-obstacles-elimination/	"Array, Breadth-First Search (BFS), Matrix"	27
+Vertical Order Traversal of a Binary Tree	Hard	https://leetcode.com/problems/vertical-order-traversal-of-a-binary-tree/	"HashMap, Tree, Depth-First Search (DFS), Breadth-First Search (BFS), Binary Tree"	27
+N-Queens II	Hard	https://leetcode.com/problems/n-queens-ii/	Backtracking	28
+Word Pattern II	Hard	https://leetcode.com/problems/word-pattern-ii/	"String, Backtracking"	28
+Word Ladder II	Hard	https://leetcode.com/problems/word-ladder-ii/	"Array, String, Backtracking, Breadth-First Search (BFS)"	28
+Remove Invalid Parentheses	Hard	https://leetcode.com/problems/remove-invalid-parentheses/	"String, Backtracking, Breadth-First Search (BFS)"	29
+Number of Ships in a Rectangle	Hard	https://leetcode.com/problems/number-of-ships-in-a-rectangle/	"Array, Divide and Conquer"	29
+Edit Distance	Hard	https://leetcode.com/problems/edit-distance/	"String, Dynamic Programming"	29
+Minimum Difficulty of a Job Schedule	Hard	https://leetcode.com/problems/minimum-difficulty-of-a-job-schedule/	"Array, Dynamic Programming"	30
+Valid Palindrome III	Hard	https://leetcode.com/problems/valid-palindrome-iii/	"String, Dynamic Programming"	30
+Interleaving String	Hard	https://leetcode.com/problems/interleaving-string/	"String, Dynamic Programming"	30
+Concatenated Words	Hard	https://leetcode.com/problems/concatenated-words/	"Array, String, Depth-First Search (DFS), Trie, Memoization"	31
+Frog Jump	Hard	https://leetcode.com/problems/frog-jump/	"Array, Dynamic Programming, Depth-First Search (DFS)"	31
+Number of Islands II	Hard	https://leetcode.com/problems/number-of-islands-ii/	"Array, Union Find"	31
+Maximal Rectangle	Hard	https://leetcode.com/problems/maximal-rectangle/	"Array, Dynamic Programming, Stack, Matrix, Monotonic Stack"	32
+The Skyline Problem	Hard	https://leetcode.com/problems/the-skyline-problem/	"Array, Divide and Conquer, Binary Indexed Tree, Segment Tree, Line Sweep, Heap (Priority Queue)"	32
+Sliding Window Median	Hard	https://leetcode.com/problems/sliding-window-median/	"Array, Sliding Window, Heap (Priority Queue), Ordered Set"	32
+Count of Smaller Numbers After Self	Hard	https://leetcode.com/problems/count-of-smaller-numbers-after-self/	"Array, Binary Indexed Tree, Segment Tree, Binary Search, Divide and Conquer"	33
+Russian Doll Envelopes	Hard	https://leetcode.com/problems/russian-doll-envelopes/	"Array, Dynamic Programming, Binary Search"	33
+Palindrome Partitioning II	Hard	https://leetcode.com/problems/palindrome-partitioning-ii/	"String, Dynamic Programming"	33
+Burst Balloons	Hard	https://leetcode.com/problems/burst-balloons/	"Array, Dynamic Programming, Divide and Conquer"	34
+Dungeon Game	Hard	https://leetcode.com/problems/dungeon-game/	"Array, Dynamic Programming, Matrix"	34
+Distinct Subsequences	Hard	https://leetcode.com/problems/distinct-subsequences/	"String, Dynamic Programming"	34
+Decode Ways II	Hard	https://leetcode.com/problems/decode-ways-ii/	"String, Dynamic Programming"	35
+Regular Expression Matching	Hard	https://leetcode.com/problems/regular-expression-matching/	"String, Dynamic Programming, Recursion"	35
+Wildcard Matching	Hard	https://leetcode.com/problems/wildcard-matching/	"String, Dynamic Programming, Greedy, Recursion"	35

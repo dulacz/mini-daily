@@ -13,7 +13,6 @@ function todoApp() {
         // UI state
         loading: true,
         error: null,
-        isDarkTheme: false,
         currentDate: '',
 
         // Progress tracking
@@ -43,7 +42,6 @@ function todoApp() {
 
         // Initialization
         async init() {
-            this.initializeTheme();
             this.currentDate = new Date().toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
@@ -55,31 +53,7 @@ function todoApp() {
             await this.loadCompletionStatus();
             this.updateDayStats();
             this.createParticles();
-            this.startAutoThemeChecker();
             this.loading = false;
-        },
-
-        // Theme management
-        initializeTheme() {
-            // Always use dark theme for todo page
-            this.isDarkTheme = true;
-            localStorage.setItem('todo-theme', 'dark'); // Separate setting for todo page
-        },
-
-        toggleTheme() {
-            // Toggle is disabled for todo page, but keep function for compatibility
-            // this.isDarkTheme = !this.isDarkTheme;
-            // localStorage.setItem('theme', this.isDarkTheme ? 'dark' : 'light');
-        },
-
-        startAutoThemeChecker() {
-            // Disabled for todo page - always dark mode
-            // setInterval(() => {
-            //     if (!localStorage.getItem('theme')) {
-            //         const hour = new Date().getHours();
-            //         this.isDarkTheme = (hour < 7 || hour >= 19);
-            //     }
-            // }, 60000);
         },
 
         // Data loading
@@ -88,8 +62,8 @@ function todoApp() {
                 const response = await fetch('/api/todo/questions');
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-                const questions = await response.json();
-                this.processQuestions(questions);
+                const data = await response.json();
+                this.processQuestions(data.questions || []);
             } catch (error) {
                 console.error('Error loading questions:', error);
                 this.error = 'Failed to load questions. Please try again.';
@@ -101,8 +75,9 @@ function todoApp() {
                 const response = await fetch('/api/todo/completed');
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-                const completed = await response.json();
-                this.completedQuestions = new Set(completed.map(q => q.question_id));
+                const data = await response.json();
+                const completed = data.completed || [];
+                this.completedQuestions = new Set(completed);
             } catch (error) {
                 console.error('Error loading completion status:', error);
                 // Continue without completion status - not critical
@@ -126,8 +101,8 @@ function todoApp() {
                     };
                 }
 
-                // Create unique question ID from name (slug)
-                const questionId = this.createQuestionId(question.name);
+                // Use question_id from API response
+                const questionId = question.question_id;
 
                 this.days[dayNumber].questions.push({
                     id: questionId,
