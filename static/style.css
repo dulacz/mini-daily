@@ -151,7 +151,7 @@ body.user-carol {
 
 /* User Tabs */
 .user-tabs {
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
 }
 
 .tab-container {
@@ -204,15 +204,16 @@ body.user-carol {
 /* Header */
 .header {
     text-align: center;
-    margin-bottom: 2rem;
-    padding: 1.5rem 0;
+    margin-bottom: 1rem;
+    padding: 0.75rem 0;
 }
 
 .header-content {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
     margin-bottom: 1rem;
+    gap: 1rem;
 }
 
 .app-title {
@@ -245,7 +246,6 @@ body.user-carol {
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-light);
     border: 1px solid var(--border-color);
-    margin-left: 1rem;
 }
 
 .star-counter {
@@ -257,7 +257,6 @@ body.user-carol {
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-light);
     border: 1px solid var(--border-color);
-    margin-left: 1rem;
 }
 
 .streak-icon {
@@ -1258,6 +1257,16 @@ body.user-carol {
 
     .activity-selection {
         margin-top: 0.5rem !important;
+    }
+
+    /* Reduce header spacing on mobile */
+    .header {
+        margin-bottom: 0.5rem !important;
+        padding: 0.5rem 0 !important;
+    }
+
+    .user-tabs {
+        margin-bottom: 0.5rem !important;
     }
 }
 

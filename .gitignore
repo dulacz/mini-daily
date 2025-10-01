@@ -20,4 +20,4 @@ htmlcov/
 
 # Logs
 *.log
-data/questions.tsv
+data/*

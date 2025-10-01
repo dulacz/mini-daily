@@ -143,6 +143,73 @@ body.user-carol {
         font-size: 0.75rem;
         min-height: 50px;
     }
+
+    /* Mobile calendar adjustments for better fit */
+    .calendar-grid {
+        gap: 0.15rem !important;
+    }
+
+    .day-cell {
+        padding: 0.15rem !important;
+        min-height: auto !important;
+        font-size: 0.7rem !important;
+    }
+
+    .day-number {
+        font-size: 0.65rem !important;
+        line-height: 1 !important;
+    }
+
+    .day-stars {
+        font-size: 0.55rem !important;
+        margin-top: 0.1rem !important;
+        line-height: 1 !important;
+    }
+
+    .calendar-header {
+        gap: 0.15rem !important;
+        margin-bottom: 0.2rem !important;
+    }
+
+    .day-header {
+        padding: 0.2rem !important;
+        font-size: 0.65rem !important;
+    }
+
+    .day-cell:hover:not(.outside-month) {
+        transform: scale(1.02) !important;
+    }
+}
+
+/* Extra small screens (phones) */
+@media (max-width: 480px) {
+    .calendar-grid {
+        gap: 0.1rem !important;
+    }
+
+    .day-cell {
+        padding: 0.1rem !important;
+        border-width: 1px !important;
+    }
+
+    .day-number {
+        font-size: 0.6rem !important;
+    }
+
+    .day-stars {
+        font-size: 0.5rem !important;
+        margin-top: 0.05rem !important;
+    }
+
+    .day-header {
+        padding: 0.15rem !important;
+        font-size: 0.6rem !important;
+    }
+
+    .calendar-header {
+        gap: 0.1rem !important;
+        margin-bottom: 0.15rem !important;
+    }
 }
 
 /* Historical Calendar Styles */

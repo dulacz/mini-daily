@@ -23,7 +23,7 @@
     <nav class="navigation">
         <div class="nav-container">
             <div class="nav-brand">
-                <h1>Task Tracker</h1>
+                <h1>Mini Daily</h1>
             </div>
             <div class="nav-links">
                 <a href="/" class="nav-link active">Daily Check-in</a>
@@ -36,7 +36,6 @@
         <!-- Header Section -->
         <header class="header">
             <div class="header-content">
-                <h1 class="app-title">Daily Check-in</h1>
                 <div class="star-counter">
                     <span class="star-icon">⭐</span>
                     <span class="star-text">
@@ -78,32 +77,11 @@
             <!-- Knowledge Task Box -->
             <div class="task-card">
                 <div class="task-header">
-                    <h3 class="task-title">📚 Knowledge</h3>
-                    <div class="task-stats">
-                        <span class="star-icon">⭐</span>
-                        <span class="star-number" x-text="getTaskCompletedCount('knowledge')"></span>
-                        <span class="star-label">/ 9 activities</span>
-                    </div>
-                </div>
-                <div class="activity-grid">
-                    <template x-for="activity in getTaskActivities('knowledge')" :key="activity.key">
-                        <button class="activity-btn-grid" :class="{ 'active': activity.completed }"
-                            @click="toggleActivity(activity.task, activity.activity)">
-                            <div class="activity-label" x-text="activity.label"></div>
-                            <div class="activity-last-completed" x-text="getTimeAgo(activity.lastCompletedDate)"></div>
-                        </button>
-                    </template>
-                </div>
-            </div>
-
-            <!-- Fitness Task Box -->
-            <div class="task-card">
-                <div class="task-header">
-                    <h3 class="task-title">💪 Fitness</h3>
+                    <h3 class="task-title">💪 运动减肥</h3>
                     <div class="task-stats">
                         <span class="star-icon">⭐</span>
                         <span class="star-number" x-text="getTaskCompletedCount('fitness')"></span>
-                        <span class="star-label">/ 9 activities</span>
+                        <span class="star-label">/ 9</span>
                     </div>
                 </div>
                 <div class="activity-grid">
@@ -117,18 +95,39 @@
                 </div>
             </div>
 
-            <!-- Creativity Task Box -->
+            <!-- Fitness Task Box -->
             <div class="task-card">
                 <div class="task-header">
-                    <h3 class="task-title">🎨 Creativity</h3>
+                    <h3 class="task-title">❤️ 家庭社会</h3>
                     <div class="task-stats">
                         <span class="star-icon">⭐</span>
-                        <span class="star-number" x-text="getTaskCompletedCount('creativity')"></span>
-                        <span class="star-label">/ 9 activities</span>
+                        <span class="star-number" x-text="getTaskCompletedCount('duty')"></span>
+                        <span class="star-label">/ 9</span>
                     </div>
                 </div>
                 <div class="activity-grid">
-                    <template x-for="activity in getTaskActivities('creativity')" :key="activity.key">
+                    <template x-for="activity in getTaskActivities('duty')" :key="activity.key">
+                        <button class="activity-btn-grid" :class="{ 'active': activity.completed }"
+                            @click="toggleActivity(activity.task, activity.activity)">
+                            <div class="activity-label" x-text="activity.label"></div>
+                            <div class="activity-last-completed" x-text="getTimeAgo(activity.lastCompletedDate)"></div>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Creativity Task Box -->
+            <div class="task-card">
+                <div class="task-header">
+                    <h3 class="task-title">😎 定义自己</h3>
+                    <div class="task-stats">
+                        <span class="star-icon">⭐</span>
+                        <span class="star-number" x-text="getTaskCompletedCount('meaning')"></span>
+                        <span class="star-label">/ 9</span>
+                    </div>
+                </div>
+                <div class="activity-grid">
+                    <template x-for="activity in getTaskActivities('meaning')" :key="activity.key">
                         <button class="activity-btn-grid" :class="{ 'active': activity.completed }"
                             @click="toggleActivity(activity.task, activity.activity)">
                             <div class="activity-label" x-text="activity.label"></div>
@@ -142,7 +141,6 @@
         <!-- Historical Calendar -->
         <section class="history-section" x-show="!loading && !error">
             <div class="history-header">
-                <h2 class="history-title">Activity History</h2>
                 <div class="month-navigation">
                     <button class="month-nav-btn" @click="previousMonth()">←</button>
                     <span class="current-month" x-text="currentMonthDisplay"></span>
@@ -329,7 +327,7 @@
 
                                 let totalCompleted = 0;
                                 if (dayData) {
-                                    // dayData is like {'creativity': 9, 'fitness': 10, 'knowledge': 8}
+                                    // dayData is like {'duty': 9, 'fitness': 10, 'meaning': 8}
                                     // Sum up all the completion counts
                                     Object.values(dayData).forEach(count => {
                                         if (typeof count === 'number') {
