@@ -115,6 +115,16 @@ function todoApp() {
 
                 this.days[dayNumber].total++;
             });
+
+            // Sort questions within each day by difficulty (Easy first, Hard last)
+            Object.values(this.days).forEach(day => {
+                day.questions.sort((a, b) => {
+                    const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
+                    const aDifficulty = a.difficulty || 'Medium'; // Default to Medium if undefined
+                    const bDifficulty = b.difficulty || 'Medium';
+                    return difficultyOrder[aDifficulty] - difficultyOrder[bDifficulty];
+                });
+            });
         },
 
         createQuestionId(name) {
@@ -136,6 +146,14 @@ function todoApp() {
                 // Update question completion status
                 day.questions.forEach(question => {
                     question.completed = this.completedQuestions.has(question.id);
+                });
+
+                // Ensure questions are sorted by difficulty (Easy first, Hard last)
+                day.questions.sort((a, b) => {
+                    const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
+                    const aDifficulty = a.difficulty || 'Medium';
+                    const bDifficulty = b.difficulty || 'Medium';
+                    return difficultyOrder[aDifficulty] - difficultyOrder[bDifficulty];
                 });
             });
         },
