@@ -90,7 +90,12 @@
                         <template x-for="activity in getTaskActivities(taskId)" :key="activity.key">
                             <button class="activity-btn-grid" :class="{ 'active': activity.completed }"
                                 @click="toggleActivity(activity.task, activity.activity)">
-                                <div class="activity-label" x-text="activity.label"></div>
+                                <div class="activity-label">
+                                    <a x-show="activity.link" :href="activity.link" target="_blank"
+                                        rel="noopener noreferrer" @click.stop x-text="activity.label"
+                                        class="activity-link"></a>
+                                    <span x-show="!activity.link" x-text="activity.label"></span>
+                                </div>
                                 <div class="activity-last-completed" x-text="getTimeAgo(activity.lastCompletedDate)">
                                 </div>
                             </button>

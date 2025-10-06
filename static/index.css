@@ -69,6 +69,27 @@
     font-size: 0.875rem;
 }
 
+.activity-btn-grid .activity-link {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+    transition: all 0.2s ease;
+}
+
+.activity-btn-grid .activity-link:hover {
+    text-decoration-style: solid;
+    color: var(--primary-color);
+}
+
+.activity-btn-grid.active .activity-link {
+    color: white;
+}
+
+.activity-btn-grid.active .activity-link:hover {
+    color: #fbbf24;
+}
+
 .activity-btn-grid .activity-last-completed {
     font-size: 0.7rem;
     opacity: 0.6;

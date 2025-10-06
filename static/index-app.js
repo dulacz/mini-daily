@@ -53,6 +53,7 @@ document.addEventListener('alpine:init', () => {
                         task: taskId,
                         activity: activityId,
                         label: task.activities[activityId].label,
+                        link: task.activities[activityId].link || null,
                         taskTitle: task.title,
                         completed: false
                     });
