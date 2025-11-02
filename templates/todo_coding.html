@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Coding Problems Tracker - Track your LeetCode progress">
+    <title>Coding Problems Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='todo.css') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', path='favicon.svg') }}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="{{ url_for('static', path='shared-utils.js') }}"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body x-data="todoCodingApp()" x-init="init()" class="dark-theme">
+    <!-- Animated Background Particles -->
+    <div class="particles" x-ref="particles"></div>
+
+    <!-- Navigation -->
+    <nav class="navigation">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1>Mini Daily</h1>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Daily Check-in</a>
+                <a href="/todo_coding" class="nav-link active">Coding Problems</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="app-container">
+        <!-- Stats Summary -->
+        <div class="stats-summary" x-show="!loading">
+            <div class="stat-card">
+                <div class="stat-value" x-text="totalCompleted"></div>
+                <div class="stat-label">Completed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" x-text="totalTodo"></div>
+                <div class="stat-label">To Do</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" x-text="progressPercentage + '%'"></div>
+                <div class="stat-label">Progress</div>
+            </div>
+        </div>
+
+        <!-- Main Content - Two Lists -->
+        <main class="lists-container">
+            <!-- Todo List -->
+            <div class="list-section" :class="{ 'collapsed': todoCollapsed }">
+                <div class="list-header" @click="todoCollapsed = !todoCollapsed">
+                    <div class="list-info">
+                        <div class="list-title">
+                            <span class="list-name">📝 To Do</span>
+                            <span class="list-count" x-text="`(${todoItems.length})`"></span>
+                        </div>
+                    </div>
+                    <div class="list-toggle">
+                        <span x-show="!todoCollapsed">▼</span>
+                        <span x-show="todoCollapsed">▶</span>
+                    </div>
+                </div>
+
+                <div class="list-content" x-show="!todoCollapsed" x-transition>
+                    <div class="items-list">
+                        <template x-for="item in todoItems" :key="item.id">
+                            <div class="item-row">
+                                <div class="item-checkbox">
+                                    <input type="checkbox" :id="`todo-${item.id}`" :checked="false"
+                                        @change="toggleItem(item.id)" class="checkbox">
+                                    <label :for="`todo-${item.id}`" class="checkbox-label"></label>
+                                </div>
+                                <div class="item-number" x-text="item.id"></div>
+                                <div class="item-details">
+                                    <div class="item-title">
+                                        <a :href="item.link" target="_blank" rel="noopener noreferrer" 
+                                            x-text="item.name" class="item-link" x-show="item.link"></a>
+                                        <span x-text="item.name" x-show="!item.link"></span>
+                                    </div>
+                                    <div class="item-meta" x-show="item.difficulty">
+                                        <span class="difficulty" :class="item.difficulty?.toLowerCase()" 
+                                            x-text="item.difficulty"></span>
+                                        <span class="topics" x-text="item.topics"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="todoItems.length === 0" class="empty-state">
+                            <p>🎉 All problems completed!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Completed List -->
+            <div class="list-section completed-section" :class="{ 'collapsed': completedCollapsed }">
+                <div class="list-header" @click="completedCollapsed = !completedCollapsed">
+                    <div class="list-info">
+                        <div class="list-title">
+                            <span class="list-name">✅ Completed</span>
+                            <span class="list-count" x-text="`(${completedItems.length})`"></span>
+                        </div>
+                    </div>
+                    <div class="list-toggle">
+                        <span x-show="!completedCollapsed">▼</span>
+                        <span x-show="completedCollapsed">▶</span>
+                    </div>
+                </div>
+
+                <div class="list-content" x-show="!completedCollapsed" x-transition>
+                    <div class="items-list">
+                        <template x-for="item in completedItems" :key="item.id">
+                            <div class="item-row completed">
+                                <div class="item-checkbox">
+                                    <input type="checkbox" :id="`completed-${item.id}`" :checked="true"
+                                        @change="toggleItem(item.id)" class="checkbox">
+                                    <label :for="`completed-${item.id}`" class="checkbox-label"></label>
+                                </div>
+                                <div class="item-number" x-text="item.id"></div>
+                                <div class="item-details">
+                                    <div class="item-title">
+                                        <a :href="item.link" target="_blank" rel="noopener noreferrer" 
+                                            x-text="item.name" class="item-link" x-show="item.link"></a>
+                                        <span x-text="item.name" x-show="!item.link"></span>
+                                    </div>
+                                    <div class="item-meta" x-show="item.difficulty">
+                                        <span class="difficulty" :class="item.difficulty?.toLowerCase()" 
+                                            x-text="item.difficulty"></span>
+                                        <span class="topics" x-text="item.topics"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="completedItems.length === 0" class="empty-state">
+                            <p>No completed problems yet. Start solving!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Loading State -->
+        <div x-show="loading" class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>Loading problems...</p>
+        </div>
+
+        <!-- Error State -->
+        <div x-show="error" class="error-container">
+            <div class="error-message">
+                <span class="error-icon">⚠️</span>
+                <p x-text="error"></p>
+                <button @click="init()" class="retry-button">Retry</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function todoCodingApp() {
+            return {
+                // Core state
+                allItems: [],
+
+                // UI state
+                loading: true,
+                error: null,
+                todoCollapsed: false,
+                completedCollapsed: true,
+
+                // Computed properties
+                get todoItems() {
+                    return this.allItems.filter(item => !item.completed);
+                },
+
+                get completedItems() {
+                    return this.allItems.filter(item => item.completed);
+                },
+
+                get totalCompleted() {
+                    return this.completedItems.length;
+                },
+
+                get totalTodo() {
+                    return this.todoItems.length;
+                },
+
+                get progressPercentage() {
+                    const total = this.allItems.length;
+                    if (total === 0) return 0;
+                    return Math.round((this.totalCompleted / total) * 100);
+                },
+
+                // Initialization
+                async init() {
+                    await this.loadItems();
+                    this.createParticles();
+                    this.loading = false;
+                },
+
+                // Load items from API
+                async loadItems() {
+                    try {
+                        const response = await fetch('/api/todo_coding/items');
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                        const data = await response.json();
+                        this.allItems = data.items || [];
+                    } catch (error) {
+                        console.error('Error loading items:', error);
+                        this.error = 'Failed to load problems. Please try again.';
+                    }
+                },
+
+                // Toggle item completion
+                async toggleItem(problemId) {
+                    try {
+                        const item = this.allItems.find(i => i.id === problemId);
+                        if (!item) return;
+
+                        const newStatus = !item.completed;
+
+                        // Optimistically update UI
+                        item.completed = newStatus;
+
+                        // Send to backend
+                        const response = await fetch('/api/todo_coding/toggle', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                problem_id: problemId,
+                                completed: newStatus
+                            })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const result = await response.json();
+                        if (!result.success) {
+                            throw new Error('Failed to save completion status');
+                        }
+
+                        // Update completed_at if returned from server
+                        if (newStatus && result.completed_at) {
+                            item.completed_at = result.completed_at;
+                        } else if (!newStatus) {
+                            item.completed_at = null;
+                        }
+
+                    } catch (error) {
+                        console.error('Error toggling item:', error);
+
+                        // Revert optimistic update on error
+                        const item = this.allItems.find(i => i.id === problemId);
+                        if (item) {
+                            item.completed = !item.completed;
+                        }
+
+                        // Show error to user
+                        this.error = 'Failed to save progress. Please try again.';
+                        setTimeout(() => {
+                            this.error = null;
+                        }, 3000);
+                    }
+                },
+
+                // Format date for display
+                formatDate(dateStr) {
+                    if (!dateStr) return '';
+                    const date = new Date(dateStr);
+                    return date.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                },
+
+                // Particles animation
+                createParticles() {
+                    const particlesContainer = this.$refs.particles;
+                    window.createParticles(particlesContainer, 30);
+                }
+            }
+        }
+
+        // Make the function globally available for Alpine.js
+        window.todoCodingApp = todoCodingApp;
+    </script>
+</body>
+
+</html>

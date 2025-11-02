@@ -15,11 +15,11 @@ app = FastAPI(title="Daily Check-in - Simplified")
 @app.on_event("startup")
 def _startup():
     db.init_db()
-    # Initialize todo questions from TSV file
+    # Initialize todo_coding from TSV file
     try:
-        db.init_todo_questions()
+        db.init_todo_coding()
     except Exception as e:
-        print(f"Warning: Failed to initialize todo questions: {e}")
+        print(f"Warning: Failed to initialize todo_coding: {e}")
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -33,8 +33,8 @@ class ActivityToggleRequest(BaseModel):
     completed: bool
 
 
-class TodoToggleRequest(BaseModel):
-    question_id: str
+class TodoCodingToggleRequest(BaseModel):
+    problem_id: int
     completed: bool
 
 
@@ -102,43 +102,27 @@ async def api_config():
     return {"user_configs": USER_CONFIGS, "default_user": DEFAULT_USER}
 
 
-# Todo-related endpoints
-@app.get("/todo", response_class=HTMLResponse)
-async def todo_page(request: Request):
-    return templates.TemplateResponse("todo.html", {"request": request})
+# Todo_coding endpoints
+@app.get("/todo_coding", response_class=HTMLResponse)
+async def todo_coding_page(request: Request):
+    return templates.TemplateResponse("todo_coding.html", {"request": request})
 
 
-@app.get("/api/todo/questions")
-async def api_todo_questions():
-    """Get all available todo questions"""
+@app.get("/api/todo_coding/items")
+async def api_todo_coding_items():
+    """Get all todo_coding items with completion status"""
     try:
-        questions = db.get_todo_questions()
-        completed = db.get_completed_todos()
-
-        # Add completion status to each question
-        for question in questions:
-            question["completed"] = question["question_id"] in completed
-
-        return {"questions": questions}
+        items = db.get_todo_coding_items()
+        return {"items": items}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting todo questions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting todo_coding items: {str(e)}")
 
 
-@app.post("/api/todo/toggle")
-async def api_todo_toggle(request: TodoToggleRequest):
-    """Toggle todo completion status"""
+@app.post("/api/todo_coding/toggle")
+async def api_todo_coding_toggle(request: TodoCodingToggleRequest):
+    """Toggle todo_coding completion status"""
     try:
-        new_status = db.toggle_todo_completion(request.question_id)
-        return {"question_id": request.question_id, "completed": new_status, "success": True}
+        new_status = db.toggle_todo_coding_completion(request.problem_id)
+        return {"problem_id": request.problem_id, "completed": new_status, "success": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error toggling todo: {str(e)}")
-
-
-@app.get("/api/todo/completed")
-async def api_todo_completed():
-    """Get completed todo questions"""
-    try:
-        completed = db.get_completed_todos()
-        return {"completed": completed}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting completed todos: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error toggling todo_coding: {str(e)}")

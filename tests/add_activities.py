@@ -70,5 +70,32 @@ def add_activities():
     finally:
         conn.close()
 
+def upsert_activity(date, task, activity, completed, completed_at):
+    conn = sqlite3.connect('data/checkins.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO activity_completions (date, task, activity, completed, completed_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(date, task, activity) DO UPDATE SET
+                completed=excluded.completed,
+                completed_at=excluded.completed_at
+        ''', (date, task, activity, completed, completed_at))
+        conn.commit()
+    except sqlite3.Error as e:
+        print(f"Database error during upsert: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+    print(f"\nUpserted: {task}-{activity} for {date} with completed={completed}")
+
+
 if __name__ == "__main__":
-    add_activities()
+    # add_activities()
+    upsert_activity(
+        date='2025-09-04',
+        task='avoidance',
+        activity='negative_thoughts',
+        completed=1,
+        completed_at=datetime(2025, 9, 4, 10, 0, 0).isoformat()
+    )

@@ -39,29 +39,17 @@ def init_db():
         """
         )
 
-        # Create todo_questions table
+        # Create todo_coding table (includes all TSV columns)
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS todo_questions(
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                question_id TEXT NOT NULL UNIQUE,
+            CREATE TABLE IF NOT EXISTS todo_coding(
+                id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
-                difficulty TEXT NOT NULL,
-                link TEXT NOT NULL,
-                topics TEXT NOT NULL,
-                day INTEGER NOT NULL
-            )
-        """
-        )
-
-        # Create todo_completed table
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS todo_completed(
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                question_id TEXT NOT NULL,
-                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(question_id)
+                difficulty TEXT,
+                link TEXT,
+                topics TEXT,
+                completed BOOLEAN NOT NULL DEFAULT 0,
+                completed_at TIMESTAMP
             )
         """
         )
@@ -195,103 +183,109 @@ def get_total_completions(days: int = 365) -> int:
         return cursor.fetchone()[0]
 
 
-# Todo-related functions (simplified - no user support)
-def init_todo_questions():
-    """Initialize todo questions from questions.tsv file"""
+# Todo_coding functions
+def init_todo_coding():
+    """Initialize todo_coding from todo_coding.tsv file on server startup"""
     import csv
     from pathlib import Path
 
-    tsv_path = Path(__file__).parent.parent.parent / "data" / "questions.tsv"
+    tsv_path = Path(__file__).parent.parent.parent / "data" / "todo_coding.tsv"
     if not tsv_path.exists():
-        print(f"Warning: questions.tsv not found at {tsv_path}")
+        print(f"Warning: todo_coding.tsv not found at {tsv_path}")
         return
 
     try:
         with get_conn() as conn:
-            # Clear existing questions
-            conn.execute("DELETE FROM todo_questions")
-
             with open(tsv_path, "r", encoding="utf-8") as file:
                 reader = csv.DictReader(file, delimiter="\t")
-                questions_added = 0
+                problems_added = 0
 
                 for row in reader:
                     try:
-                        # Generate question_id from the problem name
-                        question_id = row["Problem Name"].lower().replace(" ", "_").replace("-", "_")
+                        problem_number = int(row["ProblemNumber"])
+                        problem_name = row["Problem Name"]
+                        difficulty = row.get("Difficulty", "")
+                        link = row.get("Link", "")
+                        topics = row.get("Topics", "")
 
+                        # Insert new problems with completed=0 if they don't exist
                         conn.execute(
                             """
-                            INSERT INTO todo_questions (question_id, name, difficulty, link, topics, day)
-                            VALUES (?, ?, ?, ?, ?, ?)
+                            INSERT OR IGNORE INTO todo_coding (id, name, difficulty, link, topics, completed, completed_at)
+                            VALUES (?, ?, ?, ?, ?, 0, NULL)
                         """,
-                            (
-                                question_id,
-                                row["Problem Name"],
-                                row["Difficulty"],
-                                row["Link"],
-                                row["Topics"],
-                                int(row["Day"]),
-                            ),
+                            (problem_number, problem_name, difficulty, link, topics),
                         )
-                        questions_added += 1
+                        
+                        if conn.total_changes > 0:
+                            problems_added += 1
                     except Exception as e:
-                        print(f"Error adding question {row.get('Problem Name', 'unknown')}: {e}")
+                        print(f"Error adding problem {row.get('Problem Name', 'unknown')}: {e}")
 
-                print(f"Successfully initialized {questions_added} todo questions")
+                if problems_added > 0:
+                    print(f"Successfully added {problems_added} new todo_coding problems")
     except Exception as e:
-        print(f"Error initializing todo questions: {e}")
+        print(f"Error initializing todo_coding: {e}")
 
 
-def get_todo_questions() -> List[Dict]:
-    """Get all available todo questions"""
+def get_todo_coding_items() -> List[Dict]:
+    """Get all todo_coding items"""
     with get_conn() as conn:
         cursor = conn.execute(
             """
-            SELECT question_id, name, difficulty, link, topics, day 
-            FROM todo_questions 
-            ORDER BY day, difficulty
+            SELECT id, name, difficulty, link, topics, completed, completed_at 
+            FROM todo_coding 
+            ORDER BY id
         """
         )
 
         return [
             {
-                "question_id": row[0],
+                "id": row[0],
                 "name": row[1],
                 "difficulty": row[2],
                 "link": row[3],
                 "topics": row[4],
-                "day": row[5],
+                "completed": bool(row[5]),
+                "completed_at": row[6],
             }
             for row in cursor.fetchall()
         ]
 
 
-def toggle_todo_completion(question_id: str) -> bool:
-    """Toggle todo completion status and return new status"""
+def toggle_todo_coding_completion(problem_id: int) -> bool:
+    """Toggle todo_coding completion status and return new status"""
     with get_conn() as conn:
-        # Check if already completed
-        cursor = conn.execute("SELECT 1 FROM todo_completed WHERE question_id = ?", (question_id,))
-        is_completed = cursor.fetchone() is not None
-
-        if is_completed:
-            # Remove completion
-            conn.execute("DELETE FROM todo_completed WHERE question_id = ?", (question_id,))
-            return False
-        else:
-            # Add completion
+        # Get current status
+        cursor = conn.execute("SELECT completed FROM todo_coding WHERE id = ?", (problem_id,))
+        row = cursor.fetchone()
+        
+        if row is None:
+            raise ValueError(f"Problem ID {problem_id} not found")
+        
+        current_status = bool(row[0])
+        new_status = not current_status
+        
+        # Update status
+        if new_status:
+            # Mark as completed
             conn.execute(
                 """
-                INSERT OR IGNORE INTO todo_completed (question_id)
-                VALUES (?)
+                UPDATE todo_coding 
+                SET completed = 1, completed_at = datetime('now')
+                WHERE id = ?
             """,
-                (question_id,),
+                (problem_id,),
             )
-            return True
-
-
-def get_completed_todos() -> List[str]:
-    """Get list of completed todo question IDs"""
-    with get_conn() as conn:
-        cursor = conn.execute("SELECT question_id FROM todo_completed")
-        return [row[0] for row in cursor.fetchall()]
+        else:
+            # Mark as not completed
+            conn.execute(
+                """
+                UPDATE todo_coding 
+                SET completed = 0, completed_at = NULL
+                WHERE id = ?
+            """,
+                (problem_id,),
+            )
+        
+        return new_status
