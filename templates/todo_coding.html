@@ -52,6 +52,52 @@
 
         <!-- Main Content - Two Lists -->
         <main class="lists-container">
+            <!-- Today's Questions List -->
+            <div class="list-section today-section" :class="{ 'collapsed': todayCollapsed }">
+                <div class="list-header" @click="todayCollapsed = !todayCollapsed">
+                    <div class="list-info">
+                        <div class="list-title">
+                            <span class="list-name">🎯 Today's Questions</span>
+                            <span class="list-count" x-text="`(${todayQuestions.length})`"></span>
+                        </div>
+                    </div>
+                    <div class="list-toggle">
+                        <span x-show="!todayCollapsed">▼</span>
+                        <span x-show="todayCollapsed">▶</span>
+                    </div>
+                </div>
+
+                <div class="list-content" x-show="!todayCollapsed" x-transition>
+                    <div class="items-list">
+                        <template x-for="item in todayQuestions" :key="item.id">
+                            <div class="item-row" :class="{ 'completed': item.completed }">
+                                <div class="item-checkbox">
+                                    <input type="checkbox" :id="`today-${item.id}`" :checked="item.completed"
+                                        @change="toggleItem(item.id)" class="checkbox">
+                                    <label :for="`today-${item.id}`" class="checkbox-label"></label>
+                                </div>
+                                <div class="item-number" x-text="item.id"></div>
+                                <div class="item-details">
+                                    <div class="item-title">
+                                        <a :href="item.link" target="_blank" rel="noopener noreferrer"
+                                            x-text="item.name" class="item-link" x-show="item.link"></a>
+                                        <span x-text="item.name" x-show="!item.link"></span>
+                                    </div>
+                                    <div class="item-meta" x-show="item.difficulty">
+                                        <span class="difficulty" :class="item.difficulty?.toLowerCase()"
+                                            x-text="item.difficulty"></span>
+                                        <span class="topics" x-text="item.topics"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="todayQuestions.length === 0" class="empty-state">
+                            <p>Loading today's questions...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Todo List -->
             <div class="list-section" :class="{ 'collapsed': todoCollapsed }">
                 <div class="list-header" @click="todoCollapsed = !todoCollapsed">
@@ -79,12 +125,12 @@
                                 <div class="item-number" x-text="item.id"></div>
                                 <div class="item-details">
                                     <div class="item-title">
-                                        <a :href="item.link" target="_blank" rel="noopener noreferrer" 
+                                        <a :href="item.link" target="_blank" rel="noopener noreferrer"
                                             x-text="item.name" class="item-link" x-show="item.link"></a>
                                         <span x-text="item.name" x-show="!item.link"></span>
                                     </div>
                                     <div class="item-meta" x-show="item.difficulty">
-                                        <span class="difficulty" :class="item.difficulty?.toLowerCase()" 
+                                        <span class="difficulty" :class="item.difficulty?.toLowerCase()"
                                             x-text="item.difficulty"></span>
                                         <span class="topics" x-text="item.topics"></span>
                                     </div>
@@ -125,12 +171,12 @@
                                 <div class="item-number" x-text="item.id"></div>
                                 <div class="item-details">
                                     <div class="item-title">
-                                        <a :href="item.link" target="_blank" rel="noopener noreferrer" 
+                                        <a :href="item.link" target="_blank" rel="noopener noreferrer"
                                             x-text="item.name" class="item-link" x-show="item.link"></a>
                                         <span x-text="item.name" x-show="!item.link"></span>
                                     </div>
                                     <div class="item-meta" x-show="item.difficulty">
-                                        <span class="difficulty" :class="item.difficulty?.toLowerCase()" 
+                                        <span class="difficulty" :class="item.difficulty?.toLowerCase()"
                                             x-text="item.difficulty"></span>
                                         <span class="topics" x-text="item.topics"></span>
                                     </div>
@@ -166,10 +212,12 @@
             return {
                 // Core state
                 allItems: [],
+                todayQuestions: [],
 
                 // UI state
                 loading: true,
                 error: null,
+                todayCollapsed: false,
                 todoCollapsed: false,
                 completedCollapsed: true,
 
@@ -199,6 +247,7 @@
                 // Initialization
                 async init() {
                     await this.loadItems();
+                    await this.loadTodayQuestions();
                     this.createParticles();
                     this.loading = false;
                 },
@@ -217,6 +266,20 @@
                     }
                 },
 
+                // Load today's questions from API
+                async loadTodayQuestions() {
+                    try {
+                        const response = await fetch('/api/todo_coding/today');
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                        const data = await response.json();
+                        this.todayQuestions = data.questions || [];
+                    } catch (error) {
+                        console.error('Error loading today\'s questions:', error);
+                        this.error = 'Failed to load today\'s questions. Please try again.';
+                    }
+                },
+
                 // Toggle item completion
                 async toggleItem(problemId) {
                     try {
@@ -225,8 +288,14 @@
 
                         const newStatus = !item.completed;
 
-                        // Optimistically update UI
+                        // Optimistically update UI in both lists
                         item.completed = newStatus;
+
+                        // Also update in today's questions if present
+                        const todayItem = this.todayQuestions.find(i => i.id === problemId);
+                        if (todayItem) {
+                            todayItem.completed = newStatus;
+                        }
 
                         // Send to backend
                         const response = await fetch('/api/todo_coding/toggle', {
@@ -250,17 +319,28 @@
                         // Update completed_at if returned from server
                         if (newStatus && result.completed_at) {
                             item.completed_at = result.completed_at;
+                            if (todayItem) {
+                                todayItem.completed_at = result.completed_at;
+                            }
                         } else if (!newStatus) {
                             item.completed_at = null;
+                            if (todayItem) {
+                                todayItem.completed_at = null;
+                            }
                         }
 
                     } catch (error) {
                         console.error('Error toggling item:', error);
 
-                        // Revert optimistic update on error
+                        // Revert optimistic update on error in both lists
                         const item = this.allItems.find(i => i.id === problemId);
                         if (item) {
                             item.completed = !item.completed;
+                        }
+
+                        const todayItem = this.todayQuestions.find(i => i.id === problemId);
+                        if (todayItem) {
+                            todayItem.completed = !todayItem.completed;
                         }
 
                         // Show error to user

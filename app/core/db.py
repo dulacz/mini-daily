@@ -216,7 +216,7 @@ def init_todo_coding():
                         """,
                             (problem_number, problem_name, difficulty, link, topics),
                         )
-                        
+
                         if conn.total_changes > 0:
                             problems_added += 1
                     except Exception as e:
@@ -259,23 +259,26 @@ def toggle_todo_coding_completion(problem_id: int) -> bool:
         # Get current status
         cursor = conn.execute("SELECT completed FROM todo_coding WHERE id = ?", (problem_id,))
         row = cursor.fetchone()
-        
+
         if row is None:
             raise ValueError(f"Problem ID {problem_id} not found")
-        
+
         current_status = bool(row[0])
         new_status = not current_status
-        
+
+        # Get current date in app timezone
+        current_date = get_current_date().isoformat()
+
         # Update status
         if new_status:
-            # Mark as completed
+            # Mark as completed with current date in app timezone
             conn.execute(
                 """
                 UPDATE todo_coding 
-                SET completed = 1, completed_at = datetime('now')
+                SET completed = 1, completed_at = ?
                 WHERE id = ?
             """,
-                (problem_id,),
+                (current_date, problem_id),
             )
         else:
             # Mark as not completed
@@ -287,5 +290,113 @@ def toggle_todo_coding_completion(problem_id: int) -> bool:
             """,
                 (problem_id,),
             )
-        
+
         return new_status
+
+
+def get_today_questions(date_str: Optional[str] = None) -> List[Dict]:
+    """Get today's questions: up to 3 medium + 1 hard, selected in order by ID.
+
+    Reduces count as questions are completed today:
+    - If 0 completed today: show 3 medium + 1 hard (4 total)
+    - If 1 completed today: show fewer questions (3 total)
+    - As more are completed, list shrinks accordingly
+
+    Selection rules:
+    - Choose problems in order of ID (lowest first)
+    - Skip problems completed before today
+    - Include problems completed today (they're still in the list)
+    """
+    if date_str is None:
+        date_str = get_current_date().isoformat()
+
+    with get_conn() as conn:
+        # Count how many medium problems were completed today
+        cursor = conn.execute(
+            """
+            SELECT COUNT(*) FROM todo_coding 
+            WHERE difficulty = 'Medium' 
+            AND completed_at = ?
+            """,
+            (date_str,),
+        )
+        medium_completed_today = cursor.fetchone()[0]
+
+        # Count how many hard problems were completed today
+        cursor = conn.execute(
+            """
+            SELECT COUNT(*) FROM todo_coding 
+            WHERE difficulty = 'Hard' 
+            AND completed_at = ?
+            """,
+            (date_str,),
+        )
+        hard_completed_today = cursor.fetchone()[0]
+
+        # Calculate how many to show: 3 medium + 1 hard, minus what's completed
+        medium_needed = max(0, 3 - medium_completed_today)
+        hard_needed = max(0, 1 - hard_completed_today)
+
+        results = []
+
+        # Get hard problem(s) if needed
+        if hard_needed > 0:
+            cursor = conn.execute(
+                """
+                SELECT id, name, difficulty, link, topics, completed, completed_at
+                FROM todo_coding 
+                WHERE difficulty = 'Hard' 
+                AND (completed = 0 OR completed_at = ?)
+                ORDER BY id
+                LIMIT ?
+                """,
+                (date_str, hard_needed),
+            )
+            results.extend(cursor.fetchall())
+
+        # Get medium problems if needed
+        if medium_needed > 0:
+            cursor = conn.execute(
+                """
+                SELECT id, name, difficulty, link, topics, completed, completed_at
+                FROM todo_coding 
+                WHERE difficulty = 'Medium'
+                AND (completed = 0 OR completed_at = ?)
+                ORDER BY id
+                LIMIT ?
+                """,
+                (date_str, medium_needed),
+            )
+            results.extend(cursor.fetchall())
+
+        # If we still don't have problems (e.g., ran out of hard), fill with any remaining
+        total_needed = 4 - medium_completed_today - hard_completed_today
+        if len(results) < total_needed and total_needed > 0:
+            needed = total_needed - len(results)
+            existing_ids = [row[0] for row in results]
+
+            cursor = conn.execute(
+                f"""
+                SELECT id, name, difficulty, link, topics, completed, completed_at
+                FROM todo_coding 
+                WHERE (completed = 0 OR completed_at = ?)
+                AND id NOT IN ({','.join('?' * len(existing_ids)) if existing_ids else 'NULL'})
+                ORDER BY id
+                LIMIT ?
+                """,
+                (date_str, *existing_ids, needed) if existing_ids else (date_str, needed),
+            )
+            results.extend(cursor.fetchall())
+
+        return [
+            {
+                "id": row[0],
+                "name": row[1],
+                "difficulty": row[2],
+                "link": row[3],
+                "topics": row[4],
+                "completed": bool(row[5]),
+                "completed_at": row[6],
+            }
+            for row in results
+        ]

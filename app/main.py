@@ -126,3 +126,13 @@ async def api_todo_coding_toggle(request: TodoCodingToggleRequest):
         return {"problem_id": request.problem_id, "completed": new_status, "success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error toggling todo_coding: {str(e)}")
+
+
+@app.get("/api/todo_coding/today")
+async def api_today_questions():
+    """Get today's selected questions (3 medium + 1 hard)"""
+    try:
+        questions = db.get_today_questions()
+        return {"questions": questions}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting today's questions: {str(e)}")
