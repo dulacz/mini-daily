@@ -6,6 +6,25 @@
     margin-bottom: 2rem;
 }
 
+/* Task Card Styles */
+.task-header {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.task-info {
+    flex: 1;
+}
+
+.task-description {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+    line-height: 1.5;
+    font-style: italic;
+}
+
 /* Desktop: 3 columns */
 @media (min-width: 1024px) {
     .main-content {

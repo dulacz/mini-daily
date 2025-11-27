@@ -79,7 +79,10 @@
             <template x-for="taskId in taskIds" :key="taskId">
                 <div class="task-card">
                     <div class="task-header">
-                        <h3 class="task-title" x-text="getTaskTitle(taskId)"></h3>
+                        <div class="task-info">
+                            <h3 class="task-title" x-text="getTaskTitle(taskId)"></h3>
+                            <p class="task-description" x-text="getTaskDescription(taskId)"></p>
+                        </div>
                         <div class="task-stats">
                             <span class="star-icon">⭐</span>
                             <span class="star-number" x-text="getTaskCompletedCount(taskId)"></span>

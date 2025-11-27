@@ -271,6 +271,12 @@ document.addEventListener('alpine:init', () => {
             return icon ? `${icon} ${title}` : title;
         },
 
+        getTaskDescription(taskId) {
+            if (!this.config || !this.config.tasks[taskId]) return '';
+            const task = this.config.tasks[taskId];
+            return task.description || '';
+        },
+
         get completedToday() {
             return this.activities.filter(a => a.completed).length;
         },
