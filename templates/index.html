@@ -99,7 +99,9 @@
                                         class="activity-link"></a>
                                     <span x-show="!activity.link" x-text="activity.label"></span>
                                 </div>
-                                <div class="activity-last-completed" x-text="getTimeAgo(activity.lastCompletedDate)">
+                                <div class="activity-last-completed"
+                                    :style="getActivityColor(activity) ? { color: getActivityColor(activity), opacity: '1', fontWeight: '600' } : {}"
+                                    x-text="getTimeAgo(activity.lastCompletedDate)">
                                 </div>
                             </button>
                         </template>

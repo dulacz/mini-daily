@@ -48,14 +48,17 @@ document.addEventListener('alpine:init', () => {
             Object.keys(this.config.tasks).forEach(taskId => {
                 const task = this.config.tasks[taskId];
                 Object.keys(task.activities).forEach(activityId => {
+                    const activityConfig = task.activities[activityId];
                     this.activities.push({
                         key: `${taskId}_${activityId}`,
                         task: taskId,
                         activity: activityId,
-                        label: task.activities[activityId].label,
-                        link: task.activities[activityId].link || null,
+                        label: activityConfig.label,
+                        link: activityConfig.link || null,
                         taskTitle: task.title,
-                        completed: false
+                        completed: false,
+                        changeAfterDays: activityConfig.change_after_days || null,
+                        changeColorTo: activityConfig.change_color_to || null
                     });
                 });
             });
@@ -112,6 +115,35 @@ document.addEventListener('alpine:init', () => {
             }
             const years = Math.floor(diffDays / 365);
             return years === 1 ? '1 year ago' : `${years} years ago`;
+        },
+
+        /**
+         * Check if activity color should be changed based on days threshold
+         * @param {object} activity - Activity object with changeAfterDays and lastCompletedDate
+         * @returns {boolean} True if days exceed threshold and color should change
+         */
+        shouldChangeColor(activity) {
+            if (!activity.changeAfterDays || !activity.changeColorTo) return false;
+            if (!activity.lastCompletedDate) return true; // Never done = change color if configured
+
+            const date = new Date(activity.lastCompletedDate + 'T00:00:00');
+            const today = new Date(this.serverDate + 'T00:00:00');
+            const diffTime = today - date;
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            return diffDays >= activity.changeAfterDays;
+        },
+
+        /**
+         * Get the color style for activity last completed text
+         * @param {object} activity - Activity object
+         * @returns {string} CSS color value or empty string
+         */
+        getActivityColor(activity) {
+            if (this.shouldChangeColor(activity)) {
+                return activity.changeColorTo;
+            }
+            return '';
         },
 
         async toggleActivity(task, activity) {
@@ -245,13 +277,21 @@ document.addEventListener('alpine:init', () => {
             return this.activities
                 .filter(a => a.task === taskId)
                 .sort((a, b) => {
-                    // Null dates (never completed) come first
-                    if (!a.lastCompletedDate && !b.lastCompletedDate) return 0;
-                    if (!a.lastCompletedDate) return -1;
-                    if (!b.lastCompletedDate) return 1;
+                    // Calculate due date (last completed + change_after_days)
+                    const getDueDate = (activity) => {
+                        if (!activity.lastCompletedDate) return new Date('1900-01-01'); // Never completed = earliest
+                        const lastDate = new Date(activity.lastCompletedDate + 'T00:00:00');
+                        if (activity.changeAfterDays) {
+                            lastDate.setDate(lastDate.getDate() + activity.changeAfterDays);
+                        }
+                        return lastDate;
+                    };
 
-                    // Otherwise sort by date (oldest first)
-                    return new Date(a.lastCompletedDate) - new Date(b.lastCompletedDate);
+                    const aDueDate = getDueDate(a);
+                    const bDueDate = getDueDate(b);
+
+                    // Sort by due date (earliest/most overdue first)
+                    return aDueDate - bDueDate;
                 });
         },
 
