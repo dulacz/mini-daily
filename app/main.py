@@ -31,6 +31,7 @@ class ActivityToggleRequest(BaseModel):
     task: str
     activity: str
     completed: bool
+    date: Optional[str] = None  # If provided, record completion for this specific date
 
 
 class TodoCodingToggleRequest(BaseModel):
@@ -49,7 +50,7 @@ async def index(request: Request):
 async def toggle_activity(request: ActivityToggleRequest):
     """Toggle activity completion status"""
     try:
-        db.set_activity_completion(task=request.task, activity=request.activity, completed=request.completed)
+        db.set_activity_completion(task=request.task, activity=request.activity, completed=request.completed, date_str=request.date)
         return {"success": True, "completed": request.completed}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error toggling activity: {str(e)}")

@@ -17,6 +17,9 @@ document.addEventListener('alpine:init', () => {
         currentYear: null,
         calendarHtml: '',
 
+        // Historical date navigation
+        viewingDate: null, // null = today; set to a date string to view that day
+
         async init() {
             console.log('Initializing Wellness Tracker...');
             try {
@@ -67,23 +70,29 @@ document.addEventListener('alpine:init', () => {
         },
 
         async loadData() {
-            const response = await fetch('/api/day/completions');
+            // Use viewingDate if set, otherwise fetch today's data
+            const dateParam = this.viewingDate ? `?date_str=${this.viewingDate}` : '';
+            const response = await fetch(`/api/day/completions${dateParam}`);
             if (response.ok) {
                 const data = await response.json();
                 const completions = data.completions || {};
                 const lastCompletions = data.last_completions || {};
 
-                // Store server's date
-                this.serverDate = data.date;
+                // Always store the server's true current date on first load
+                if (!this.serverDate) {
+                    this.serverDate = data.date;
+                }
 
-                // Initialize calendar to server's current month/year
+                // Initialize calendar to server's current month/year on first load
                 if (this.currentMonth === null) {
                     const serverDateObj = new Date(this.serverDate + 'T00:00:00');
                     this.currentMonth = serverDateObj.getMonth();
                     this.currentYear = serverDateObj.getFullYear();
                 }
 
-                // Update activity completion status and last completion date
+                // Update activity completion status and last completion date.
+                // Only activities present in the current config are updated —
+                // deprecated DB entries are silently ignored.
                 this.activities.forEach(activity => {
                     const taskCompletions = completions[activity.task] || {};
                     activity.completed = taskCompletions[activity.activity] || false;
@@ -92,6 +101,60 @@ document.addEventListener('alpine:init', () => {
                     activity.lastCompletedDate = taskLastCompletions[activity.activity] || null;
                 });
             }
+        },
+
+        /**
+         * Load activity board for a specific historical date
+         * @param {string} dateStr - ISO date string (YYYY-MM-DD)
+         */
+        async loadHistoricalDay(dateStr) {
+            try {
+                this.viewingDate = dateStr;
+                await this.loadData();
+                // Navigate calendar view to the month of the selected date
+                const d = new Date(dateStr + 'T00:00:00');
+                this.currentMonth = d.getMonth();
+                this.currentYear = d.getFullYear();
+                await this.renderCalendar();
+                // Scroll to top of activity board
+                const mainContent = document.querySelector('.main-content');
+                if (mainContent) mainContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (error) {
+                console.error('Error loading historical day:', error);
+            }
+        },
+
+        /**
+         * Return to today's activities view
+         */
+        async returnToToday() {
+            try {
+                this.viewingDate = null;
+                await this.loadData();
+                // Navigate calendar back to current month
+                const serverDateObj = new Date(this.serverDate + 'T00:00:00');
+                this.currentMonth = serverDateObj.getMonth();
+                this.currentYear = serverDateObj.getFullYear();
+                await this.updateStats();
+                await this.renderCalendar();
+            } catch (error) {
+                console.error('Error returning to today:', error);
+            }
+        },
+
+        /**
+         * Handle click on calendar grid (event delegation)
+         * @param {MouseEvent} event
+         */
+        handleCalendarClick(event) {
+            const cell = event.target.closest('[data-date]');
+            if (!cell) return;
+            const dateStr = cell.dataset.date;
+            if (!dateStr) return;
+            // Don't reload if already viewing this date
+            const currentlyViewing = this.viewingDate || this.serverDate;
+            if (dateStr === currentlyViewing) return;
+            this.loadHistoricalDay(dateStr);
         },
 
         getTimeAgo(dateStr) {
@@ -153,23 +216,31 @@ document.addEventListener('alpine:init', () => {
             // Toggle completion
             activityObj.completed = !activityObj.completed;
 
-            // Save to backend
+            // Save to backend — include the viewing date so historical edits are stored correctly
             try {
+                const body = {
+                    task: task,
+                    activity: activity,
+                    completed: activityObj.completed
+                };
+                if (this.viewingDate) {
+                    body.date = this.viewingDate;
+                }
+
                 const response = await fetch('/api/activity/toggle', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        task: task,
-                        activity: activity,
-                        completed: activityObj.completed
-                    })
+                    body: JSON.stringify(body)
                 });
 
                 if (!response.ok) {
                     // Revert on error
                     activityObj.completed = !activityObj.completed;
                 } else {
-                    await this.updateStats();
+                    // Only refresh stats when viewing today
+                    if (!this.viewingDate) {
+                        await this.updateStats();
+                    }
                     await this.renderCalendar();
                 }
             } catch (error) {
@@ -238,8 +309,13 @@ document.addEventListener('alpine:init', () => {
                         else if (totalCompleted >= 1) levelClass = 'level-1';
 
                         const isToday = dateStr === todayDateStr ? 'today' : '';
+                        const currentlyViewing = this.viewingDate || todayDateStr;
+                        const isSelected = dateStr === currentlyViewing ? 'selected' : '';
+                        // Only past and today dates are clickable (not future dates)
+                        const isFuture = dateStr > todayDateStr;
+                        const clickable = isFuture ? '' : 'clickable';
 
-                        html += `<div class="day-cell ${levelClass} ${isToday}">
+                        html += `<div class="day-cell ${levelClass} ${isToday} ${isSelected} ${clickable}" ${!isFuture ? `data-date="${dateStr}"` : ''}>
                             <div class="day-number">${dayNumber}</div>
                             ${totalCompleted > 0 ? `<div class="day-stars">⭐${totalCompleted}</div>` : ''}
                         </div>`;
@@ -315,6 +391,16 @@ document.addEventListener('alpine:init', () => {
             if (!this.config || !this.config.tasks[taskId]) return '';
             const task = this.config.tasks[taskId];
             return task.description || '';
+        },
+
+        get isViewingHistorical() {
+            return this.viewingDate !== null && this.viewingDate !== this.serverDate;
+        },
+
+        get viewingDateDisplay() {
+            const d = this.viewingDate || this.serverDate;
+            if (!d) return '';
+            return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         },
 
         get completedToday() {

@@ -73,6 +73,13 @@
             <button @click="init()" class="retry-btn">Retry</button>
         </div>
 
+        <!-- Historical Date Banner -->
+        <div x-show="isViewingHistorical" class="historical-banner">
+            <span class="historical-banner__icon">📅</span>
+            <span class="historical-banner__text">Viewing <strong x-text="viewingDateDisplay"></strong></span>
+            <button class="historical-banner__btn" @click="returnToToday()">← Back to Today</button>
+        </div>
+
         <!-- Main Content -->
         <section class="main-content" x-show="!loading && !error">
             <!-- Dynamic Task Cards from Config -->
@@ -120,7 +127,7 @@
                     <button class="month-nav-btn" @click="nextMonth()">→</button>
                 </div>
             </div>
-            <div class="calendar-grid" x-html="calendarHtml"></div>
+            <div class="calendar-grid" x-html="calendarHtml" @click="handleCalendarClick($event)"></div>
         </section>
     </div>
 
