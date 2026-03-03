@@ -29,6 +29,8 @@
             <div class="nav-links">
                 <a href="/" class="nav-link active">Daily Check-in</a>
                 <a href="/todo_coding" class="nav-link">Coding Problems</a>
+                <span id="auto-close-timer" class="auto-close-timer" title="Page closes after 5 minutes of inactivity">⏱
+                    5:00</span>
             </div>
         </div>
     </nav>
@@ -132,6 +134,54 @@
     </div>
 
     <script src="{{ url_for('static', path='index-app.js') }}"></script>
+    <script>
+        // Auto-redirect to /todo_coding after 10 seconds of inactivity
+        (function () {
+            'use strict';
+            const TIMEOUT_SEC = 2 * 60;
+            let remaining = TIMEOUT_SEC;
+            let closeTimer;
+            let tickInterval;
+
+            const timerEl = document.getElementById('auto-close-timer');
+
+            /**
+             * Formats seconds into MM:SS string
+             * @param {number} secs - Seconds remaining
+             * @returns {string} Formatted time string
+             */
+            function formatTime(secs) {
+                const m = Math.floor(secs / 60);
+                const s = secs % 60;
+                return '⏱ ' + m + ':' + (s < 10 ? '0' : '') + s;
+            }
+
+            function startTimers() {
+                closeTimer = setTimeout(function () {
+                    window.location.href = '/todo_coding';
+                }, remaining * 1000);
+                tickInterval = setInterval(function () {
+                    remaining -= 1;
+                    if (timerEl) timerEl.textContent = formatTime(remaining);
+                    if (remaining <= 0) clearInterval(tickInterval);
+                }, 1000);
+            }
+
+            function resetTimer() {
+                clearTimeout(closeTimer);
+                clearInterval(tickInterval);
+                remaining = TIMEOUT_SEC;
+                if (timerEl) timerEl.textContent = formatTime(remaining);
+                startTimers();
+            }
+
+            ['mousemove', 'keydown', 'click', 'scroll'].forEach(function (event) {
+                document.addEventListener(event, resetTimer, { passive: true });
+            });
+
+            startTimers();
+        })();
+    </script>
 </body>
 
 </html>
