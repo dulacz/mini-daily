@@ -8,6 +8,7 @@ from typing import Dict, Optional
 
 from .core.config import USER_CONFIGS, DEFAULT_USER
 from .core import db
+from .core import newsfeed
 
 app = FastAPI(title="Daily Check-in - Simplified")
 
@@ -20,6 +21,8 @@ def _startup():
         db.init_todo_coding()
     except Exception as e:
         print(f"Warning: Failed to initialize todo_coding: {e}")
+    # Start S1 newsfeed background worker
+    newsfeed.start_background_worker()
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -137,3 +140,38 @@ async def api_today_questions():
         return {"questions": questions}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting today's questions: {str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# Newsfeed routes
+# ---------------------------------------------------------------------------
+
+
+@app.get("/newsfeed", response_class=HTMLResponse)
+async def newsfeed_page(request: Request):
+    """S1 外野 daily newsfeed page"""
+    return templates.TemplateResponse("newsfeed.html", {"request": request})
+
+
+@app.get("/api/newsfeed/status")
+async def api_newsfeed_status():
+    """Return metadata about the last newsfeed run"""
+    return newsfeed.get_status() | {"is_running": newsfeed.is_running()}
+
+
+@app.get("/api/newsfeed/latest")
+async def api_newsfeed_latest():
+    """Return the most recently generated newsfeed data"""
+    data = newsfeed.get_latest_result()
+    if data is None:
+        return {"ready": False, "posts": []}
+    return data | {"ready": True}
+
+
+@app.post("/api/newsfeed/run")
+async def api_newsfeed_run():
+    """Manually trigger a newsfeed generation job (runs in background thread)"""
+    started = newsfeed.trigger_manual_job(days_ago=1)
+    if not started:
+        return {"started": False, "message": "Job already running"}
+    return {"started": True, "message": "Job started in background"}
