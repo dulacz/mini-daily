@@ -60,8 +60,10 @@ document.addEventListener('alpine:init', () => {
                         link: activityConfig.link || null,
                         taskTitle: task.title,
                         completed: false,
-                        changeAfterDays: activityConfig.change_after_days || null,
-                        changeColorTo: activityConfig.change_color_to || null
+                        intervalDays: activityConfig.interval_days || null,
+                        colorRecent: task.color_recent || null,
+                        colorOverdue: task.color_overdue || null,
+                        streakBorder: task.streak_border !== false
                     });
                 });
             });
@@ -77,6 +79,7 @@ document.addEventListener('alpine:init', () => {
                 const data = await response.json();
                 const completions = data.completions || {};
                 const lastCompletions = data.last_completions || {};
+                const recentCounts = data.recent_counts || {};
 
                 // Always store the server's true current date on first load
                 if (!this.serverDate) {
@@ -99,6 +102,7 @@ document.addEventListener('alpine:init', () => {
 
                     const taskLastCompletions = lastCompletions[activity.task] || {};
                     activity.lastCompletedDate = taskLastCompletions[activity.activity] || null;
+                    activity.recentCount = (recentCounts[activity.task] || {})[activity.activity] || 0;
                 });
             }
         },
@@ -181,31 +185,35 @@ document.addEventListener('alpine:init', () => {
         },
 
         /**
-         * Check if activity color should be changed based on days threshold
-         * @param {object} activity - Activity object with changeAfterDays and lastCompletedDate
-         * @returns {boolean} True if days exceed threshold and color should change
-         */
-        shouldChangeColor(activity) {
-            if (!activity.changeAfterDays || !activity.changeColorTo) return false;
-            if (!activity.lastCompletedDate) return true; // Never done = change color if configured
-
-            const date = new Date(activity.lastCompletedDate + 'T00:00:00');
-            const today = new Date(this.serverDate + 'T00:00:00');
-            const diffTime = today - date;
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-            return diffDays >= activity.changeAfterDays;
-        },
-
-        /**
          * Get the color style for activity last completed text
          * @param {object} activity - Activity object
          * @returns {string} CSS color value or empty string
          */
         getActivityColor(activity) {
-            if (this.shouldChangeColor(activity)) {
-                return activity.changeColorTo;
+            if (!activity.intervalDays) return '';
+
+            if (!activity.lastCompletedDate) {
+                return activity.colorOverdue || '';
             }
+
+            const date = new Date(activity.lastCompletedDate + 'T00:00:00');
+            const today = new Date(this.serverDate + 'T00:00:00');
+            const diffDays = Math.floor((today - date) / (1000 * 60 * 60 * 24));
+
+            if (diffDays < activity.intervalDays / 2) {
+                return activity.colorRecent || '';
+            } else if (diffDays >= activity.intervalDays) {
+                return activity.colorOverdue || '';
+            }
+            return '';
+        },
+
+        getActivityLabel(activity) {
+            return activity.label;
+        },
+
+        getActivityStreakBorder(activity) {
+            if (activity.streakBorder && activity.recentCount >= 2) return '#418a3e';
             return '';
         },
 
@@ -353,21 +361,32 @@ document.addEventListener('alpine:init', () => {
             return this.activities
                 .filter(a => a.task === taskId)
                 .sort((a, b) => {
-                    // Calculate due date (last completed + change_after_days)
+                    // Calculate due date (last completed + interval_days)
                     const getDueDate = (activity) => {
                         if (!activity.lastCompletedDate) return new Date('1900-01-01'); // Never completed = earliest
                         const lastDate = new Date(activity.lastCompletedDate + 'T00:00:00');
-                        if (activity.changeAfterDays) {
-                            lastDate.setDate(lastDate.getDate() + activity.changeAfterDays);
+                        if (activity.intervalDays) {
+                            lastDate.setDate(lastDate.getDate() + activity.intervalDays);
                         }
                         return lastDate;
                     };
 
-                    const aDueDate = getDueDate(a);
-                    const bDueDate = getDueDate(b);
+                    // 0 = red (overdue), 1 = normal, 2 = green (recent)
+                    const getColorPriority = (activity) => {
+                        if (!activity.intervalDays) return 1;
+                        if (!activity.lastCompletedDate) return 0;
+                        const diffDays = Math.floor((new Date(this.serverDate + 'T00:00:00') - new Date(activity.lastCompletedDate + 'T00:00:00')) / (1000 * 60 * 60 * 24));
+                        if (diffDays < activity.intervalDays / 2) return 2;
+                        if (diffDays >= activity.intervalDays) return 0;
+                        return 1;
+                    };
 
-                    // Sort by due date (earliest/most overdue first)
-                    return aDueDate - bDueDate;
+                    const aPriority = getColorPriority(a);
+                    const bPriority = getColorPriority(b);
+                    if (aPriority !== bPriority) return aPriority - bPriority;
+
+                    // Within same color group, sort by due date (earliest/most overdue first)
+                    return getDueDate(a) - getDueDate(b);
                 });
         },
 

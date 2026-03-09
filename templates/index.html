@@ -103,12 +103,13 @@
                         <template x-for="activity in getTaskActivities(taskId)" :key="activity.key">
                             <button class="activity-btn-grid" :class="{ 'active': activity.completed }"
                                 @click="toggleActivity(activity.task, activity.activity)"
-                                :title="activity.lastCompletedDate || 'Never completed'">
+                                :title="activity.lastCompletedDate || 'Never completed'"
+                                :style="getActivityStreakBorder(activity) ? { borderColor: getActivityStreakBorder(activity) } : {}">
                                 <div class="activity-label">
                                     <a x-show="activity.link" :href="activity.link" target="_blank"
-                                        rel="noopener noreferrer" @click.stop x-text="activity.label"
+                                        rel="noopener noreferrer" @click.stop x-text="getActivityLabel(activity)"
                                         class="activity-link"></a>
-                                    <span x-show="!activity.link" x-text="activity.label"></span>
+                                    <span x-show="!activity.link" x-text="getActivityLabel(activity)"></span>
                                 </div>
                                 <div class="activity-last-completed"
                                     :style="getActivityColor(activity) ? { color: getActivityColor(activity), opacity: '1', fontWeight: '600' } : {}"

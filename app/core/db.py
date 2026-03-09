@@ -118,6 +118,30 @@ def get_last_completion_dates(exclude_date: Optional[str] = None) -> Dict[str, D
         return result
 
 
+def get_activity_recent_counts(task_configs: Dict) -> Dict[str, Dict[str, int]]:
+    """Get completion counts per activity within each activity's 3x interval_days window."""
+    today = get_current_date()
+    result = {}
+    with get_conn() as conn:
+        for task_id, task_cfg in task_configs.items():
+            activities = task_cfg.get("activities", {})
+            for activity_id, act_cfg in activities.items():
+                interval = act_cfg.get("interval_days")
+                if not interval:
+                    continue
+                cutoff = (today - timedelta(days=3 * interval - 1)).isoformat()
+                cursor = conn.execute(
+                    """
+                    SELECT COUNT(*) FROM activity_completions
+                    WHERE task = ? AND activity = ? AND completed = 1 AND date >= ?
+                    """,
+                    (task_id, activity_id, cutoff),
+                )
+                count = cursor.fetchone()[0]
+                result.setdefault(task_id, {})[activity_id] = count
+    return result
+
+
 def get_history(days: int = 30) -> Dict[str, Dict[str, int]]:
     """Get completion history for the last N days"""
     cutoff = (get_current_date() - timedelta(days=days - 1)).isoformat()

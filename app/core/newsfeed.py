@@ -11,7 +11,7 @@ import threading
 import time
 import os
 from pathlib import Path
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from collections import Counter
 from typing import Optional
 
@@ -125,6 +125,16 @@ def _get_date_str(days_ago: int = 1) -> str:
     """Return a date string N days ago in YYYY-MM-DD format."""
     target = datetime.today() - timedelta(days=days_ago)
     return target.strftime("%Y-%m-%d")
+
+
+def _utc_now() -> datetime:
+    """Return the current UTC-aware datetime."""
+    return datetime.now(timezone.utc)
+
+
+def _utc_now_filename() -> str:
+    """Return a filesystem-safe UTC datetime string suitable for cache filenames."""
+    return _utc_now().strftime("%Y-%m-%dT%H-%M-%SZ")
 
 
 def _extract_title_from_path(path: Path) -> str:
@@ -326,11 +336,11 @@ def run_daily_job(days_ago: int = 1, model: str = "gpt-4o") -> dict:
     Returns the result dict.
     """
     github_token = _load_github_token()
-    job_start = datetime.now()
+    job_utc = _utc_now()
     target_date = _get_date_str(days_ago)
     _, _, request_delay = _get_model_limits(model)
 
-    print(f"[Newsfeed] Starting daily job for {target_date} at {job_start.isoformat()}")
+    print(f"[Newsfeed] Starting daily job for {target_date} at {job_utc.isoformat()}")
 
     # Step 1 — git pull
     pull_result = git_pull()
@@ -343,7 +353,8 @@ def run_daily_job(days_ago: int = 1, model: str = "gpt-4o") -> dict:
     # Step 3 — summarise; persist partial results after each post so the UI
     # can show cards as they arrive instead of waiting for all 20.
     NEWSFEED_DATA_PATH.mkdir(parents=True, exist_ok=True)
-    output_file = NEWSFEED_DATA_PATH / f"{target_date}.json"
+    # Filename encodes the GMT time the job was started, e.g. 2026-03-08T14-30-00Z.json
+    output_file = NEWSFEED_DATA_PATH / f"{job_utc.strftime('%Y-%m-%dT%H-%M-%SZ')}.json"
     total = len(posts)
     completed_posts: list = []
 
@@ -361,7 +372,7 @@ def run_daily_job(days_ago: int = 1, model: str = "gpt-4o") -> dict:
 
         # Write partial snapshot after every post
         partial_output = {
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": _utc_now().isoformat(),
             "date": target_date,
             "pull_result": pull_result,
             "partial": True,
@@ -372,7 +383,7 @@ def run_daily_job(days_ago: int = 1, model: str = "gpt-4o") -> dict:
 
     # Step 4 — mark complete
     output = {
-        "generated_at": datetime.now().isoformat(),
+        "generated_at": _utc_now().isoformat(),
         "date": target_date,
         "pull_result": pull_result,
         "partial": False,
@@ -428,25 +439,29 @@ _is_running = False
 def _background_worker():
     """
     Worker that runs in a daemon thread.
-    Checks hourly whether today's newsfeed has been generated; if not, runs the job.
-    The 'today' newsfeed summarises yesterday's top posts (days_ago=1).
+    On first iteration (including server startup) and every hour thereafter,
+    checks whether the latest cached newsfeed is more than 12 hours old (GMT).
+    If so — or if no cache exists — runs the daily job.
     """
     global _is_running
     while True:
         try:
-            target_date = _get_date_str(days_ago=1)
-            output_file = NEWSFEED_DATA_PATH / f"{target_date}.json"
-
-            # Skip if a complete (non-partial) result already exists for this date
+            # Determine whether a fresh run is needed based on GMT age of latest cache
             needs_run = True
-            if output_file.exists():
+            result = get_latest_result()
+            if result and not result.get("partial", True):
+                generated_at_str = result.get("generated_at", "")
                 try:
-                    data = json.loads(output_file.read_text(encoding="utf-8"))
-                    if not data.get("partial", True):
+                    dt = datetime.fromisoformat(generated_at_str)
+                    if dt.tzinfo is None:
+                        # Legacy naive timestamp — assume UTC
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    age = _utc_now() - dt.astimezone(timezone.utc)
+                    if age < timedelta(hours=12):
                         needs_run = False
-                        print(f"[Newsfeed] {output_file.name} already complete, skipping.")
+                        print(f"[Newsfeed] Latest cache is {age.total_seconds() / 3600:.1f}h old " "(< 12 h), skipping.")
                 except Exception:
-                    pass  # Corrupt file → re-run
+                    pass  # Unparseable timestamp → re-run
 
             if needs_run:
                 # Non-blocking acquire: skip if a manual run is already holding the lock

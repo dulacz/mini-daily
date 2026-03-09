@@ -6,7 +6,7 @@ from datetime import date
 from pydantic import BaseModel
 from typing import Dict, Optional
 
-from .core.config import USER_CONFIGS, DEFAULT_USER
+from .core.config import USER_CONFIGS, DEFAULT_USER, TASK_CONFIGS
 from .core import db
 from .core import newsfeed
 
@@ -65,10 +65,12 @@ async def get_day_completions(date_str: Optional[str] = None):
     try:
         completions = db.get_day_completions(date_str)
         last_completions = db.get_last_completion_dates(date_str)
+        recent_counts = db.get_activity_recent_counts(TASK_CONFIGS)
         return {
             "date": date_str or db.get_current_date().isoformat(),
             "completions": completions,
             "last_completions": last_completions,
+            "recent_counts": recent_counts,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting day completions: {str(e)}")
