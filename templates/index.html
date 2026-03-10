@@ -90,8 +90,8 @@
                 <div class="task-card">
                     <div class="task-header">
                         <div class="task-info">
-                            <h3 class="task-title" x-text="getTaskTitle(taskId)"></h3>
-                            <p class="task-description" x-text="getTaskDescription(taskId)"></p>
+                            <h3 class="task-title" :data-tooltip="getTaskDescription(taskId)"
+                                x-text="getTaskTitle(taskId)"></h3>
                         </div>
                         <div class="task-stats">
                             <span class="star-icon">⭐</span>
@@ -103,7 +103,7 @@
                         <template x-for="activity in getTaskActivities(taskId)" :key="activity.key">
                             <button class="activity-btn-grid" :class="{ 'active': activity.completed }"
                                 @click="toggleActivity(activity.task, activity.activity)"
-                                :title="activity.lastCompletedDate || 'Never completed'"
+                                :data-tooltip="activity.tooltip || null"
                                 :style="getActivityStreakBorder(activity) ? { borderColor: getActivityStreakBorder(activity) } : {}">
                                 <div class="activity-label">
                                     <a x-show="activity.link" :href="activity.link" target="_blank"
@@ -113,6 +113,7 @@
                                 </div>
                                 <div class="activity-last-completed"
                                     :style="getActivityColor(activity) ? { color: getActivityColor(activity), opacity: '1', fontWeight: '600' } : {}"
+                                    :title="activity.lastCompletedDate || 'Never completed'"
                                     x-text="getTimeAgo(activity.lastCompletedDate)">
                                 </div>
                             </button>

@@ -61,6 +61,7 @@ document.addEventListener('alpine:init', () => {
                         taskTitle: task.title,
                         completed: false,
                         intervalDays: activityConfig.interval_days || null,
+                        tooltip: activityConfig.tooltip || null,
                         colorRecent: task.color_recent || null,
                         colorOverdue: task.color_overdue || null,
                         streakBorder: task.streak_border !== false
