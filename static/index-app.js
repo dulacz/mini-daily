@@ -63,8 +63,7 @@ document.addEventListener('alpine:init', () => {
                         intervalDays: activityConfig.interval_days || null,
                         tooltip: activityConfig.tooltip || null,
                         colorRecent: task.color_recent || null,
-                        colorOverdue: task.color_overdue || null,
-                        streakBorder: task.streak_border !== false
+                        colorOverdue: task.color_overdue || null
                     });
                 });
             });
@@ -213,10 +212,7 @@ document.addEventListener('alpine:init', () => {
             return activity.label;
         },
 
-        getActivityStreakBorder(activity) {
-            if (activity.streakBorder && activity.recentCount >= 2) return '#418a3e';
-            return '';
-        },
+
 
         async toggleActivity(task, activity) {
             const activityObj = this.activities.find(a => a.task === task && a.activity === activity);

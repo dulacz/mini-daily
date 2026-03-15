@@ -27,11 +27,11 @@
                 <h1>Mini Daily</h1>
             </div>
             <div class="nav-links">
+                <span id="auto-close-timer" class="auto-close-timer" title="Page closes after 5 minutes of inactivity">⏱
+                    5:00</span>
                 <a href="/" class="nav-link active">Daily Check-in</a>
                 <a href="/todo_coding" class="nav-link">Coding Problems</a>
                 <a href="/newsfeed" class="nav-link">S1 外野</a>
-                <span id="auto-close-timer" class="auto-close-timer" title="Page closes after 5 minutes of inactivity">⏱
-                    5:00</span>
             </div>
         </div>
     </nav>
@@ -104,7 +104,7 @@
                             <button class="activity-btn-grid" :class="{ 'active': activity.completed }"
                                 @click="toggleActivity(activity.task, activity.activity)"
                                 :data-tooltip="activity.tooltip || null"
-                                :style="getActivityStreakBorder(activity) ? { borderColor: getActivityStreakBorder(activity) } : {}">
+>
                                 <div class="activity-label">
                                     <a x-show="activity.link" :href="activity.link" target="_blank"
                                         rel="noopener noreferrer" @click.stop x-text="getActivityLabel(activity)"

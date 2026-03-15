@@ -87,6 +87,44 @@ function renderMarkdown(text) {
 }
 
 /**
+ * Format an ISO timestamp as Pacific Time with minute precision.
+ * @param {string} isoString
+ * @returns {string}
+ */
+function formatPacificMinute(isoString) {
+    try {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        if (Number.isNaN(date.getTime())) return '';
+
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Los_Angeles',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+        });
+        const parts = Object.fromEntries(
+            formatter.formatToParts(date)
+                .filter((part) => part.type !== 'literal')
+                .map((part) => [part.type, part.value])
+        );
+        const tzNamePart = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Los_Angeles',
+            timeZoneName: 'short',
+        }).formatToParts(date).find((part) => part.type === 'timeZoneName');
+        const tzName = tzNamePart ? tzNamePart.value : 'PT';
+
+        return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute} ${tzName}`;
+    } catch (error) {
+        console.error('formatPacificMinute error:', error);
+        return '';
+    }
+}
+
+/**
  * Update the header meta line with date and status badge.
  * @param {object} status  - API /api/newsfeed/status response
  */
@@ -95,8 +133,11 @@ function updateMeta(status) {
         const metaDate = document.getElementById('meta-date');
         const metaStatus = document.getElementById('meta-status');
         const actionHint = document.getElementById('action-hint');
+        const pacificTimestamp = formatPacificMinute(status.last_run);
 
-        if (status.last_date) {
+        if (pacificTimestamp) {
+            metaDate.textContent = `数据时间（Pacific）：${pacificTimestamp}`;
+        } else if (status.last_date) {
             metaDate.textContent = `数据日期：${status.last_date}`;
         } else {
             metaDate.textContent = '暂无历史数据';
