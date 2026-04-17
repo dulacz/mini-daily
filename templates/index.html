@@ -31,7 +31,9 @@
                     5:00</span>
                 <a href="/" class="nav-link active">Daily Check-in</a>
                 <a href="/todo_coding" class="nav-link">Coding Problems</a>
-                <a href="/newsfeed" class="nav-link">S1 外野</a>
+                {% if features.newsfeed_s1 %}<a href="/newsfeed_s1" class="nav-link">S1 外野</a>{% endif %}
+                {% if features.newsfeed_hn %}<a href="/newsfeed_hn" class="nav-link">Hacker News</a>{% endif %}
+                {% if features.growth %}<a href="/growth" class="nav-link">Growth</a>{% endif %}
             </div>
         </div>
     </nav>
@@ -90,8 +92,9 @@
                 <div class="task-card">
                     <div class="task-header">
                         <div class="task-info">
-                            <h3 class="task-title" :data-tooltip="getTaskDescription(taskId)"
-                                x-text="getTaskTitle(taskId)"></h3>
+                            <h3 class="task-title" x-text="getTaskTitle(taskId)"></h3>
+                            <p class="task-description" x-show="getTaskDescription(taskId)"
+                                x-text="getTaskDescription(taskId)"></p>
                         </div>
                         <div class="task-stats">
                             <span class="star-icon">⭐</span>
@@ -103,8 +106,7 @@
                         <template x-for="activity in getTaskActivities(taskId)" :key="activity.key">
                             <button class="activity-btn-grid" :class="{ 'active': activity.completed }"
                                 @click="toggleActivity(activity.task, activity.activity)"
-                                :data-tooltip="activity.tooltip || null"
->
+                                :data-tooltip="activity.tooltip || null">
                                 <div class="activity-label">
                                     <a x-show="activity.link" :href="activity.link" target="_blank"
                                         rel="noopener noreferrer" @click.stop x-text="getActivityLabel(activity)"
@@ -141,7 +143,7 @@
         // Auto-redirect to /todo_coding after 10 seconds of inactivity
         (function () {
             'use strict';
-            const TIMEOUT_SEC = 2 * 60;
+            const TIMEOUT_SEC = 60;
             let remaining = TIMEOUT_SEC;
             let closeTimer;
             let tickInterval;

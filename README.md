@@ -75,12 +75,12 @@ python -m venv .venv
 pip install -r requirements.txt
 
 # Start the server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8068
 ```
 
 ### 📱 Access from Mobile
 1. Run `ipconfig` to find your computer's IPv4 address
-2. Open `http://<YOUR-IP>:8000/` on your phone/tablet
+2. Open `http://<YOUR-IP>:8068/` on your phone/tablet
 3. Bookmark for easy daily access
 
 ## ⚙️ Configuration

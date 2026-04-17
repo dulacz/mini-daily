@@ -425,9 +425,9 @@
 }
 
 .list-section.today-section {
-    border-color: var(--accent-color);
-    background: var(--accent-bg);
-    border-width: 2px;
+    border-color: var(--border-color);
+    background: var(--surface-color);
+    border-width: 1px;
 }
 
 .list-section.completed-section {

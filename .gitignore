@@ -21,3 +21,14 @@ htmlcov/
 # Logs
 *.log
 data/*
+
+# Private features (newsfeed + growth) — kept local only
+app/core/newsfeed_hn.py
+app/core/newsfeed_s1.py
+templates/newsfeed_hn.html
+templates/newsfeed_s1.html
+templates/growth.html
+static/newsfeed.css
+static/newsfeed_hn.js
+static/newsfeed_s1.js
+static/growth.css

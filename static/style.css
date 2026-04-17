@@ -24,10 +24,10 @@
 
 /* Dark theme variables */
 .dark-theme {
-    --background-color: #0f172a;
-    --surface-color: #1e293b;
-    --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
+    --background-color: #22272e;
+    --surface-color: #2d333b;
+    --text-primary: #d4dae2;
+    --text-secondary: #d4dae2;
     --text-light: #64748b;
     --border-color: #334155;
 }
@@ -98,7 +98,7 @@ body.dark-theme .particle:nth-child(even) {
 
 .nav-link.active {
     color: #ffffff;
-    background: rgba(99, 102, 241, 0.3);
+    background: var(--surface-color);
     font-weight: 600;
 }
 
@@ -123,7 +123,7 @@ body.dark-theme .particle:nth-child(even) {
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #1a1a1a;
+    background: #22272e;
     background-attachment: fixed;
     color: var(--text-primary);
     line-height: 1.6;

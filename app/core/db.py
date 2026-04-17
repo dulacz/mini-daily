@@ -319,11 +319,11 @@ def toggle_todo_coding_completion(problem_id: int) -> bool:
 
 
 def get_today_questions(date_str: Optional[str] = None) -> List[Dict]:
-    """Get today's questions: up to 3 medium + 1 hard, selected in order by ID.
+    """Get today's questions: up to 2 medium + 1 hard, selected in order by ID.
 
     Reduces count as questions are completed today:
-    - If 0 completed today: show 3 medium + 1 hard (4 total)
-    - If 1 completed today: show fewer questions (3 total)
+    - If 0 completed today: show 2 medium + 1 hard (3 total)
+    - If 1 completed today: show fewer questions (2 total)
     - As more are completed, list shrinks accordingly
 
     Selection rules:
@@ -357,8 +357,8 @@ def get_today_questions(date_str: Optional[str] = None) -> List[Dict]:
         )
         hard_completed_today = cursor.fetchone()[0]
 
-        # Calculate how many to show: 3 medium + 1 hard, minus what's completed
-        medium_needed = max(0, 3 - medium_completed_today)
+        # Calculate how many to show: 2 medium + 1 hard, minus what's completed
+        medium_needed = max(0, 2 - medium_completed_today)
         hard_needed = max(0, 1 - hard_completed_today)
 
         results = []
@@ -394,7 +394,7 @@ def get_today_questions(date_str: Optional[str] = None) -> List[Dict]:
             results.extend(cursor.fetchall())
 
         # If we still don't have problems (e.g., ran out of hard), fill with any remaining
-        total_needed = 4 - medium_completed_today - hard_completed_today
+        total_needed = 3 - medium_completed_today - hard_completed_today
         if len(results) < total_needed and total_needed > 0:
             needed = total_needed - len(results)
             existing_ids = [row[0] for row in results]
