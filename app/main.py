@@ -13,7 +13,7 @@ from .core import db
 
 # ---------------------------------------------------------------------------
 # Optional private features — imported only if their source files exist locally.
-# This lets the newsfeed/growth modules be excluded from git without breaking
+# This lets the newsfeed modules be excluded from git without breaking
 # the rest of the app.
 # ---------------------------------------------------------------------------
 _BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,12 +38,9 @@ if (_BASE_DIR / "app" / "core" / "newsfeed_hn.py").exists() and (_BASE_DIR / "te
         print(f"Warning: Failed to import newsfeed_hn: {e}")
         newsfeed_hn = None
 
-_GROWTH_AVAILABLE = (_BASE_DIR / "templates" / "growth.html").exists() and (_BASE_DIR / "data" / "growth.md").exists()
-
 FEATURES = {
     "newsfeed_s1": newsfeed_s1 is not None,
     "newsfeed_hn": newsfeed_hn is not None,
-    "growth": _GROWTH_AVAILABLE,
 }
 
 app = FastAPI(title="Daily Check-in - Simplified")
@@ -278,42 +275,3 @@ if newsfeed_hn is not None:
         if not started:
             return {"started": False, "message": "Job already running"}
         return {"started": True, "message": "Job started in background"}
-
-
-# ---------------------------------------------------------------------------
-# Growth page (registered only if growth.md + template exist)
-# ---------------------------------------------------------------------------
-
-
-def _parse_growth_md() -> list[dict]:
-    """Parse data/growth.md into a list of {title, items} sections."""
-    path = Path("data/growth.md")
-    sections: list[dict] = []
-    current: dict | None = None
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        # Section header: "## Title" or "1. Title"
-        if stripped.startswith("## "):
-            if current:
-                sections.append(current)
-            current = {"title": stripped[3:].strip(), "items": []}
-        elif stripped[0].isdigit() and ". " in stripped:
-            if current:
-                sections.append(current)
-            current = {"title": stripped, "items": []}
-        elif stripped.startswith("- ") and current is not None:
-            html = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", stripped[2:])
-            current["items"].append(html)
-    if current:
-        sections.append(current)
-    return sections
-
-
-if _GROWTH_AVAILABLE:
-
-    @app.get("/growth", response_class=HTMLResponse)
-    async def growth_page(request: Request):
-        sections = _parse_growth_md()
-        return templates.TemplateResponse("growth.html", {"request": request, "sections": sections})
