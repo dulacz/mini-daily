@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 import re
 from pydantic import BaseModel
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from .core.config import USER_CONFIGS, DEFAULT_USER, TASK_CONFIGS
 from .core import db
@@ -54,6 +54,7 @@ async def favicon():
 @app.on_event("startup")
 def _startup():
     db.init_db()
+    db.init_review_cards()
     # Initialize todo_coding from TSV file
     try:
         db.init_todo_coding()
@@ -89,7 +90,7 @@ class TodoCodingToggleRequest(BaseModel):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     today = db.get_current_date().isoformat()
-    return templates.TemplateResponse("index.html", {"request": request, "today": today})
+    return templates.TemplateResponse(request, "index.html", {"today": today})
 
 
 # New simplified API endpoints
@@ -155,7 +156,19 @@ async def api_config():
 # Todo_coding endpoints
 @app.get("/todo_coding", response_class=HTMLResponse)
 async def todo_coding_page(request: Request):
-    return templates.TemplateResponse("todo_coding.html", {"request": request})
+    return templates.TemplateResponse(request, "todo_coding.html")
+
+
+@app.get("/worldcup-flag-quiz", response_class=HTMLResponse)
+async def worldcup_flag_quiz_page(request: Request):
+    return templates.TemplateResponse(request, "worldcup_flag_quiz.html")
+
+
+@app.get("/worldcup_flag_quiz")
+async def worldcup_flag_quiz_redirect():
+    from fastapi.responses import RedirectResponse
+
+    return RedirectResponse(url="/worldcup-flag-quiz")
 
 
 @app.get("/api/todo_coding/items")
@@ -197,7 +210,7 @@ if newsfeed_s1 is not None:
     @app.get("/newsfeed_s1", response_class=HTMLResponse)
     async def newsfeed_s1_page(request: Request):
         """S1 外野 daily newsfeed page"""
-        return templates.TemplateResponse("newsfeed_s1.html", {"request": request})
+        return templates.TemplateResponse(request, "newsfeed_s1.html")
 
     # Keep old URL working as redirect
     @app.get("/newsfeed", response_class=HTMLResponse)
@@ -245,7 +258,7 @@ if newsfeed_hn is not None:
     @app.get("/newsfeed_hn", response_class=HTMLResponse)
     async def newsfeed_hn_page(request: Request):
         """Hacker News daily newsfeed page"""
-        return templates.TemplateResponse("newsfeed_hn.html", {"request": request})
+        return templates.TemplateResponse(request, "newsfeed_hn.html")
 
     @app.get("/api/newsfeed_hn/status")
     async def api_newsfeed_hn_status():
@@ -275,3 +288,80 @@ if newsfeed_hn is not None:
         if not started:
             return {"started": False, "message": "Job already running"}
         return {"started": True, "message": "Job started in background"}
+
+
+# ---------------------------------------------------------------------------
+# Review Cards (Anki-style spaced repetition)
+# ---------------------------------------------------------------------------
+
+
+class ReviewCardCreateRequest(BaseModel):
+    title: str
+    category_name: str
+
+
+class ReviewCardReviewRequest(BaseModel):
+    card_id: int
+    difficulty: str  # "easy" | "ok" | "hard"
+
+
+class ReviewCardRenameRequest(BaseModel):
+    card_id: int
+    title: str
+
+
+@app.get("/review_cards", response_class=HTMLResponse)
+async def review_cards_page(request: Request):
+    return templates.TemplateResponse(request, "review_cards.html")
+
+
+@app.get("/api/review_cards/categories")
+async def api_review_categories():
+    return {"categories": db.get_review_categories()}
+
+
+@app.get("/api/review_cards/all")
+async def api_review_cards_all():
+    return {"cards": db.get_review_cards(), "intervals": db.REVIEW_INTERVALS}
+
+
+@app.get("/api/review_cards/today")
+async def api_review_cards_today():
+    return {"cards": db.get_today_review_cards(), "intervals": db.REVIEW_INTERVALS}
+
+
+@app.post("/api/review_cards/create")
+async def api_review_card_create(req: ReviewCardCreateRequest):
+    try:
+        cat_id = db.create_review_category(req.category_name)
+        card = db.create_review_card(req.title, cat_id)
+        return {"success": True, "card": card}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/review_cards/review")
+async def api_review_card_review(req: ReviewCardReviewRequest):
+    try:
+        result = db.review_card(req.card_id, req.difficulty)
+        return {"success": True, **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/review_cards/rename")
+async def api_review_card_rename(req: ReviewCardRenameRequest):
+    try:
+        db.rename_review_card(req.card_id, req.title)
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/review_cards/{card_id}")
+async def api_review_card_delete(card_id: int):
+    try:
+        db.delete_review_card(card_id)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

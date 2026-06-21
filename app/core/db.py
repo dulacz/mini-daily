@@ -25,8 +25,7 @@ def init_db():
     """Initialize database tables"""
     with get_conn() as conn:
         # Create activity_completions table
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS activity_completions(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 date TEXT NOT NULL,
@@ -36,12 +35,10 @@ def init_db():
                 completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(date, task, activity)
             )
-        """
-        )
+        """)
 
         # Create todo_coding table (includes all TSV columns)
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS todo_coding(
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -51,8 +48,7 @@ def init_db():
                 completed BOOLEAN NOT NULL DEFAULT 0,
                 completed_at TIMESTAMP
             )
-        """
-        )
+        """)
 
 
 def set_activity_completion(task: str, activity: str, completed: bool, date_str: Optional[str] = None):
@@ -255,13 +251,11 @@ def init_todo_coding():
 def get_todo_coding_items() -> List[Dict]:
     """Get all todo_coding items"""
     with get_conn() as conn:
-        cursor = conn.execute(
-            """
+        cursor = conn.execute("""
             SELECT id, name, difficulty, link, topics, completed, completed_at 
             FROM todo_coding 
             ORDER BY id
-        """
-        )
+        """)
 
         return [
             {
@@ -424,3 +418,225 @@ def get_today_questions(date_str: Optional[str] = None) -> List[Dict]:
             }
             for row in results
         ]
+
+
+# ---------------------------------------------------------------------------
+# Review Cards (Anki-style spaced repetition)
+# ---------------------------------------------------------------------------
+
+# Ebbinghaus forgetting curve intervals (in days)
+REVIEW_INTERVALS = [1, 2, 4, 7, 15, 30]
+
+
+def init_review_cards():
+    """Create review_cards and review_categories tables"""
+    with get_conn() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS review_categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL
+            )
+            """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS review_cards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                category_id INTEGER NOT NULL,
+                interval_index INTEGER NOT NULL DEFAULT 0,
+                next_review_date TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                last_reviewed_at TEXT,
+                review_count INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (category_id) REFERENCES review_categories(id)
+            )
+            """)
+
+
+def get_review_categories() -> List[Dict]:
+    """Get all review categories"""
+    with get_conn() as conn:
+        cursor = conn.execute("SELECT id, name FROM review_categories ORDER BY name")
+        return [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+
+
+def create_review_category(name: str) -> int:
+    """Create a category if it doesn't exist, return its id"""
+    name = name.strip()
+    with get_conn() as conn:
+        cursor = conn.execute("SELECT id FROM review_categories WHERE name = ?", (name,))
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+        cursor = conn.execute("INSERT INTO review_categories (name) VALUES (?)", (name,))
+        return cursor.lastrowid
+
+
+def create_review_card(title: str, category_id: int) -> Dict:
+    """Create a new review card. First review is tomorrow."""
+    today = get_current_date().isoformat()
+    next_review = (get_current_date() + timedelta(days=REVIEW_INTERVALS[0])).isoformat()
+    with get_conn() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO review_cards (title, category_id, interval_index, next_review_date, created_at)
+            VALUES (?, ?, 0, ?, ?)
+            """,
+            (title, category_id, next_review, today),
+        )
+        return {
+            "id": cursor.lastrowid,
+            "title": title,
+            "category_id": category_id,
+            "interval_index": 0,
+            "next_review_date": next_review,
+            "created_at": today,
+            "last_reviewed_at": None,
+            "review_count": 0,
+        }
+
+
+def review_card(card_id: int, difficulty: str) -> Dict:
+    """Review a card with difficulty: easy / ok / hard.
+
+    Given the card's current interval_index i in REVIEW_INTERVALS:
+      - easy:  next interval = REVIEW_INTERVALS[i+1]  (advance)
+      - ok:    next interval = REVIEW_INTERVALS[i]    (stay)
+      - hard:  next interval = REVIEW_INTERVALS[i-1]  (regress)
+
+    When a card at the last interval (30d) is reviewed with easy,
+    it becomes mastered (next_review_date = NULL).
+    """
+    today = get_current_date()
+    with get_conn() as conn:
+        cursor = conn.execute(
+            "SELECT interval_index, review_count FROM review_cards WHERE id = ?",
+            (card_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            raise ValueError(f"Card {card_id} not found")
+
+        idx, review_count = row
+        max_idx = len(REVIEW_INTERVALS) - 1
+
+        if difficulty == "easy":
+            new_idx = min(idx + 1, max_idx + 1)  # can go past max to indicate mastered
+        elif difficulty == "ok":
+            new_idx = idx
+        elif difficulty == "hard":
+            new_idx = max(idx - 1, 0)
+        else:
+            raise ValueError(f"Invalid difficulty: {difficulty}")
+
+        # Mastered: past the last interval
+        if new_idx > max_idx:
+            conn.execute(
+                """
+                UPDATE review_cards
+                SET interval_index = ?, next_review_date = NULL,
+                    last_reviewed_at = ?, review_count = ?
+                WHERE id = ?
+                """,
+                (new_idx, today.isoformat(), review_count + 1, card_id),
+            )
+            return {
+                "id": card_id,
+                "interval_index": new_idx,
+                "interval_days": None,
+                "next_review_date": None,
+                "review_count": review_count + 1,
+                "mastered": True,
+            }
+
+        interval_days = REVIEW_INTERVALS[new_idx]
+        next_review = (today + timedelta(days=interval_days)).isoformat()
+
+        conn.execute(
+            """
+            UPDATE review_cards
+            SET interval_index = ?, next_review_date = ?,
+                last_reviewed_at = ?, review_count = ?
+            WHERE id = ?
+            """,
+            (new_idx, next_review, today.isoformat(), review_count + 1, card_id),
+        )
+        return {
+            "id": card_id,
+            "interval_index": new_idx,
+            "interval_days": interval_days,
+            "next_review_date": next_review,
+            "review_count": review_count + 1,
+            "mastered": False,
+        }
+
+
+def _card_row_to_dict(row) -> Dict:
+    """Convert a review_cards query row to a dict."""
+    idx = row[4]
+    max_idx = len(REVIEW_INTERVALS) - 1
+    mastered = idx > max_idx
+    return {
+        "id": row[0],
+        "title": row[1],
+        "category_id": row[2],
+        "category_name": row[3],
+        "interval_index": idx,
+        "interval_days": REVIEW_INTERVALS[idx] if idx <= max_idx else None,
+        "next_review_date": row[5],
+        "created_at": row[6],
+        "last_reviewed_at": row[7],
+        "review_count": row[8],
+        "mastered": mastered,
+        "progress": min(idx, len(REVIEW_INTERVALS) - 1) * 100 // (len(REVIEW_INTERVALS) - 1),
+    }
+
+
+def get_review_cards() -> List[Dict]:
+    """Get all review cards with category name"""
+    with get_conn() as conn:
+        cursor = conn.execute("""
+            SELECT c.id, c.title, c.category_id, cat.name AS category_name,
+                   c.interval_index, c.next_review_date, c.created_at,
+                   c.last_reviewed_at, c.review_count
+            FROM review_cards c
+            JOIN review_categories cat ON c.category_id = cat.id
+            ORDER BY cat.name, c.next_review_date
+            """)
+        return [_card_row_to_dict(row) for row in cursor.fetchall()]
+
+
+def get_today_review_cards() -> List[Dict]:
+    """Get cards due for review today (next_review_date <= today), excluding mastered"""
+    today = get_current_date().isoformat()
+    with get_conn() as conn:
+        cursor = conn.execute(
+            """
+            SELECT c.id, c.title, c.category_id, cat.name AS category_name,
+                   c.interval_index, c.next_review_date, c.created_at,
+                   c.last_reviewed_at, c.review_count
+            FROM review_cards c
+            JOIN review_categories cat ON c.category_id = cat.id
+            WHERE c.next_review_date IS NOT NULL AND c.next_review_date <= ?
+            ORDER BY c.next_review_date, cat.name
+            """,
+            (today,),
+        )
+        return [_card_row_to_dict(row) for row in cursor.fetchall()]
+
+
+def delete_review_card(card_id: int):
+    """Delete a review card"""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM review_cards WHERE id = ?", (card_id,))
+
+
+def rename_review_card(card_id: int, new_title: str):
+    """Rename a review card"""
+    new_title = new_title.strip()
+    if not new_title:
+        raise ValueError("Title cannot be empty")
+    with get_conn() as conn:
+        cursor = conn.execute("SELECT id FROM review_cards WHERE id = ?", (card_id,))
+        if cursor.fetchone() is None:
+            raise ValueError(f"Card {card_id} not found")
+        conn.execute("UPDATE review_cards SET title = ? WHERE id = ?", (new_title, card_id))

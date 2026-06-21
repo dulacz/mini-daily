@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Anki - Spaced repetition tracker">
+    <title>Anki</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='review_cards.css') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', path='favicon.svg') }}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="{{ url_for('static', path='shared-utils.js') }}"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body x-data="reviewCardsApp()" x-init="init()" class="dark-theme">
+    <!-- Animated Background Particles -->
+    <div class="particles" x-ref="particles"></div>
+
+    <!-- Navigation -->
+    <nav class="navigation">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1>Mini Daily</h1>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Daily Check-in</a>
+                <a href="/todo_coding" class="nav-link">Coding Problems</a>
+                <a href="/review_cards" class="nav-link active">Anki</a>
+                <a href="/worldcup-flag-quiz" class="nav-link">Flag Quiz</a>
+                {% if features.newsfeed_s1 %}<a href="/newsfeed_s1" class="nav-link">S1 外野</a>{% endif %}
+                {% if features.newsfeed_hn %}<a href="/newsfeed_hn" class="nav-link">Hacker News</a>{% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="app-container">
+
+        <!-- Create New Card -->
+        <div class="section-card create-card-section">
+            <h2 class="section-title">✏️ New Review Card</h2>
+            <form @submit.prevent="createCard()" class="create-form">
+                <div class="form-row">
+                    <div class="form-group form-group-title">
+                        <label for="card-title">Task</label>
+                        <input id="card-title" type="text" x-model="newCard.title" placeholder="Enter a memory task..."
+                            required class="form-input" />
+                    </div>
+                    <div class="form-group form-group-category">
+                        <label for="card-category">Category</label>
+                        <div class="category-input-wrapper">
+                            <input id="card-category" type="text" x-model="newCard.categoryInput"
+                                placeholder="Select or type new..." list="category-list" required class="form-input"
+                                @focus="showCategoryDropdown = true"
+                                @blur="setTimeout(() => showCategoryDropdown = false, 200)" />
+                            <datalist id="category-list">
+                                <template x-for="cat in categories" :key="cat.id">
+                                    <option :value="cat.name"></option>
+                                </template>
+                            </datalist>
+                        </div>
+                    </div>
+                    <div class="form-group form-group-btn">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="btn btn-primary"
+                            :disabled="!newCard.title.trim() || !newCard.categoryInput.trim()">
+                            Add Card
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Today's Review Cards -->
+        <div class="section-card" x-show="todayCards.length > 0">
+            <h2 class="section-title">📋 Today's Reviews</h2>
+            <div class="review-list">
+                <template x-for="card in todayCards" :key="card.id">
+                    <div class="review-item" :class="{ 'overdue': isOverdue(card) }">
+                        <div class="review-item-info">
+                            <span class="category-tag" x-text="card.category_name"></span>
+                            <span class="review-title" x-html="linkify(card.title)"></span>
+                            <span class="review-meta">
+                                Review #<span x-text="card.review_count + 1"></span>
+                                · interval: <span x-text="card.interval_days"></span>d
+                            </span>
+                        </div>
+                        <div class="review-actions">
+                            <button class="btn btn-difficulty btn-hard" @click="reviewCard(card.id, 'hard')"
+                                title="Hard — shorter interval">
+                                😰 困难
+                            </button>
+                            <button class="btn btn-difficulty btn-ok" @click="reviewCard(card.id, 'ok')"
+                                title="OK — same interval">
+                                🙂 OK
+                            </button>
+                            <button class="btn btn-difficulty btn-easy" @click="reviewCard(card.id, 'easy')"
+                                title="Easy — longer interval">
+                                😎 简单
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div class="section-card" x-show="todayCards.length === 0 && !loading">
+            <div class="empty-state">
+                <span class="empty-icon">🎉</span>
+                <p>No cards due for review today!</p>
+            </div>
+        </div>
+
+        <!-- All Cards Table -->
+        <div class="section-card">
+            <h2 class="section-title">📚 All Cards</h2>
+
+            <!-- Sort Controls -->
+            <div class="sort-controls">
+                <button class="btn btn-sm" @click="toggleSort('category')">
+                    Sort by Category
+                    <span x-show="sortBy === 'category'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span>
+                </button>
+                <button class="btn btn-sm" @click="toggleSort('next_review_date')">
+                    Sort by Review Date
+                    <span x-show="sortBy === 'next_review_date'" x-text="sortDir === 'asc' ? '↑' : '↓'"></span>
+                </button>
+            </div>
+
+            <div class="table-wrapper" x-show="sortedAllCards.length > 0">
+                <table class="cards-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Task</th>
+                            <th>Interval</th>
+                            <th>Next Review</th>
+                            <th>Progress</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="card in sortedAllCards" :key="card.id">
+                            <tr
+                                :class="{ 'row-overdue': isOverdue(card), 'row-today': isToday(card), 'row-mastered': card.mastered }">
+                                <td><span class="category-tag-sm" x-text="card.category_name"></span></td>
+                                <td x-html="linkify(card.title)"></td>
+                                <td x-text="card.mastered ? '✅' : card.interval_days + 'd'"></td>
+                                <td :class="{ 'text-overdue': isOverdue(card), 'text-today': isToday(card) }"
+                                    x-text="card.mastered ? 'Mastered' : formatDate(card.next_review_date)"></td>
+                                <td>
+                                    <div class="progress-bar-wrapper">
+                                        <div class="progress-bar" :style="'width:' + card.progress + '%'"
+                                            :class="progressClass(card.progress)"></div>
+                                    </div>
+                                    <span class="progress-text" x-text="card.progress + '%'"></span>
+                                </td>
+                                <td class="action-cell">
+                                    <button class="btn btn-icon" @click="renameCard(card)"
+                                        title="Rename card">✏️</button>
+                                    <button class="btn btn-icon btn-delete" @click="deleteCard(card.id)"
+                                        title="Delete card">🗑</button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            <div class="empty-state" x-show="sortedAllCards.length === 0 && !loading">
+                <p>No cards yet. Create one above!</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', path='review_cards.js') }}"></script>
+</body>
+
+</html>

@@ -8,8 +8,8 @@
     --newsfeed-rank-color: #6366f1;
     --newsfeed-badge-bg: rgba(99, 102, 241, 0.15);
     --newsfeed-badge-color: #a5b4fc;
-    --newsfeed-title-color: #d4dae2;
-    --newsfeed-summary-color: #d4dae2;
+    --newsfeed-title-color: #adbac7;
+    --newsfeed-summary-color: #adbac7;
     --newsfeed-running-color: #f59e0b;
     --newsfeed-ready-color: #10b981;
     --newsfeed-empty-color: #64748b;
@@ -56,7 +56,7 @@
 }
 
 .newsfeed-title {
-    font-size: 1.5rem;
+    font-size: 1.625rem;
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
@@ -64,7 +64,7 @@
 
 @media (min-width: 768px) {
     .newsfeed-title {
-        font-size: 1.75rem;
+        font-size: 1.875rem;
     }
 }
 
@@ -274,14 +274,8 @@
     border: 1px solid var(--newsfeed-card-border);
     border-radius: var(--radius-lg);
     padding: 1.125rem 1.25rem;
-    transition: border-color 0.2s, box-shadow 0.2s;
     cursor: pointer;
     scroll-margin-top: 4rem;
-}
-
-.post-card:hover {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 1px var(--primary-color);
 }
 
 .post-rank {
@@ -313,10 +307,14 @@
 
 .post-title {
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 1.0625rem;
     color: var(--newsfeed-title-color);
     text-decoration: none;
     word-break: break-word;
+}
+
+.post-title-hot {
+    color: #f5a623;
 }
 
 .post-title:hover {
@@ -332,7 +330,7 @@
 
 .post-badge {
     flex-shrink: 0;
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     font-weight: 500;
     padding: 0.125rem 0.5rem;
     border-radius: 9999px;
@@ -342,7 +340,7 @@
 }
 
 .post-summary {
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
     line-height: 1.65;
     color: var(--newsfeed-summary-color);
     word-break: break-word;
@@ -381,7 +379,7 @@
 
 @media (min-width: 768px) {
     .post-title {
-        font-size: 1.0625rem;
+        font-size: 1.125rem;
     }
 }
 
@@ -566,6 +564,10 @@
     .toc-list a:hover {
         color: var(--newsfeed-badge-color);
         text-decoration: underline;
+    }
+
+    .toc-list a.toc-hot {
+        color: #f5a623;
     }
 }
 

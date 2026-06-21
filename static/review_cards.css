@@ -1,0 +1,428 @@
+/* Review Cards page styles */
+
+.stats-summary {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.stat-card {
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.5rem;
+    text-align: center;
+    flex: 1;
+    min-width: 100px;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-top: 0.25rem;
+}
+
+/* Section cards */
+.section-card {
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 1rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.badge {
+    background: var(--primary-color);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+}
+
+/* Create form */
+.create-form .form-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.form-group label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.form-group-title {
+    flex: 2;
+    min-width: 200px;
+}
+
+.form-group-category {
+    flex: 1;
+    min-width: 160px;
+}
+
+.form-group-btn {
+    flex: 0 0 auto;
+}
+
+.form-input {
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background: var(--background-color);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.form-input:focus {
+    border-color: var(--primary-color);
+}
+
+/* Buttons */
+.btn {
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background: var(--surface-color);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.btn:hover {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background: var(--secondary-color);
+}
+
+.btn-sm {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+}
+
+.btn-active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
+.btn-icon {
+    padding: 0.25rem 0.5rem;
+    background: transparent;
+    border: none;
+    font-size: 0.9rem;
+    opacity: 0.5;
+}
+
+.btn-icon:hover {
+    opacity: 1;
+}
+
+.action-cell {
+    white-space: nowrap;
+}
+
+/* Difficulty buttons */
+.btn-difficulty {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+}
+
+.btn-hard {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btn-hard:hover {
+    background: rgba(239, 68, 68, 0.25);
+}
+
+.btn-ok {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+.btn-ok:hover {
+    background: rgba(245, 158, 11, 0.25);
+}
+
+.btn-easy {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.btn-easy:hover {
+    background: rgba(16, 185, 129, 0.25);
+}
+
+/* Review list (today's cards) */
+.review-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.review-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--background-color);
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.review-item.overdue {
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.review-item-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
+.category-tag {
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--primary-color);
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.category-tag-sm {
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--primary-color);
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.review-title {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.review-meta {
+    font-size: 0.75rem;
+    color: var(--text-light);
+}
+
+.review-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+/* Sort controls */
+.sort-controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+/* Progress bar */
+.progress-bar-wrapper {
+    width: 60px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.progress-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+
+.progress-low {
+    background: #ef4444;
+}
+
+.progress-mid {
+    background: #f59e0b;
+}
+
+.progress-good {
+    background: #10b981;
+}
+
+.progress-complete {
+    background: linear-gradient(90deg, #10b981, #06d6a0);
+}
+
+.progress-text {
+    font-size: 0.7rem;
+    color: var(--text-light);
+    margin-left: 0.4rem;
+    vertical-align: middle;
+}
+
+.row-mastered {
+    opacity: 0.6;
+}
+
+.cards-table a,
+.review-title a {
+    color: var(--primary-color);
+    text-decoration: none;
+    word-break: break-all;
+}
+
+.cards-table a:hover,
+.review-title a:hover {
+    text-decoration: underline;
+}
+
+/* Table */
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.cards-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.cards-table th,
+.cards-table td {
+    text-align: left;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cards-table th {
+    font-weight: 600;
+    color: var(--text-light);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.cards-table tbody tr:hover {
+    background: rgba(99, 102, 241, 0.04);
+}
+
+.row-overdue {
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.row-today {
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.text-overdue {
+    color: #ef4444 !important;
+    font-weight: 600;
+}
+
+.text-today {
+    color: #f59e0b !important;
+    font-weight: 600;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-light);
+}
+
+.empty-icon {
+    font-size: 2.5rem;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .create-form .form-row {
+        flex-direction: column;
+    }
+
+    .form-group-title,
+    .form-group-category {
+        min-width: 100%;
+    }
+
+    .review-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .review-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .cards-table {
+        font-size: 0.8rem;
+    }
+
+    .cards-table th,
+    .cards-table td {
+        padding: 0.5rem;
+    }
+}
