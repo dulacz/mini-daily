@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from datetime import date
 from pathlib import Path
 import re
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
 
 from .core.config import USER_CONFIGS, DEFAULT_USER, TASK_CONFIGS
@@ -38,9 +38,13 @@ if (_BASE_DIR / "app" / "core" / "newsfeed_hn.py").exists() and (_BASE_DIR / "te
         print(f"Warning: Failed to import newsfeed_hn: {e}")
         newsfeed_hn = None
 
+from .core import paper, sina_quotes, stocks
+
 FEATURES = {
     "newsfeed_s1": newsfeed_s1 is not None,
     "newsfeed_hn": newsfeed_hn is not None,
+    "stocks": True,
+    "paper": True,
 }
 
 app = FastAPI(title="Daily Check-in - Simplified")
@@ -60,6 +64,12 @@ def _startup():
         db.init_todo_coding()
     except Exception as e:
         print(f"Warning: Failed to initialize todo_coding: {e}")
+    try:
+        db.init_stocks()
+        db.init_paper()
+        stocks.start_background_worker()
+    except Exception as e:
+        print(f"Warning: Failed to initialize stocks: {e}")
     # Start S1 newsfeed background worker
     if newsfeed_s1 is not None:
         newsfeed_s1.start_background_worker()
@@ -70,6 +80,16 @@ def _startup():
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+
+def _static_url(path: str) -> str:
+    """Static URL stamped with the file's mtime so browsers never serve a stale asset."""
+    file = _BASE_DIR / "static" / path
+    version = int(file.stat().st_mtime) if file.exists() else 0
+    return f"/static/{path}?v={version}"
+
+
+templates.env.globals["static_url"] = _static_url
 # Expose feature flags to all templates so nav links can be toggled.
 templates.env.globals["features"] = FEATURES
 
@@ -157,18 +177,6 @@ async def api_config():
 @app.get("/todo_coding", response_class=HTMLResponse)
 async def todo_coding_page(request: Request):
     return templates.TemplateResponse(request, "todo_coding.html")
-
-
-@app.get("/worldcup-flag-quiz", response_class=HTMLResponse)
-async def worldcup_flag_quiz_page(request: Request):
-    return templates.TemplateResponse(request, "worldcup_flag_quiz.html")
-
-
-@app.get("/worldcup_flag_quiz")
-async def worldcup_flag_quiz_redirect():
-    from fastapi.responses import RedirectResponse
-
-    return RedirectResponse(url="/worldcup-flag-quiz")
 
 
 @app.get("/api/todo_coding/items")
@@ -365,3 +373,226 @@ async def api_review_card_delete(card_id: int):
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# A-share price monitor
+# ---------------------------------------------------------------------------
+
+# Accepts a bare 6-digit A-share code; an sh/sz/bj prefix is only needed for indices.
+SYMBOL_PATTERN = r"^((sh|sz|bj)\d{6}|\d{6})$"
+
+
+class StockAddRequest(BaseModel):
+    symbol: str = Field(pattern=SYMBOL_PATTERN)
+    name: str = ""
+
+
+class StockUpdateRequest(BaseModel):
+    id: int
+    name: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+class AlertSettingsRequest(BaseModel):
+    rsi_high: Optional[float] = Field(default=None, ge=0, le=100)
+    rsi_low: Optional[float] = Field(default=None, ge=0, le=100)
+    pct_high: Optional[float] = Field(default=None, ge=0, le=100)
+    pct_low: Optional[float] = Field(default=None, ge=0, le=100)
+
+
+@app.get("/stocks", response_class=HTMLResponse)
+async def stocks_page(request: Request):
+    return templates.TemplateResponse(request, "stocks.html")
+
+
+@app.get("/api/stocks/list")
+async def api_stocks_list():
+    return {"stocks": stocks.get_watchlist(), "settings": db.get_alert_settings()}
+
+
+@app.post("/api/stocks/settings")
+async def api_stocks_settings(req: AlertSettingsRequest):
+    try:
+        db.set_alert_settings(**req.model_dump())
+        return {"success": True, "settings": db.get_alert_settings()}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/stocks/status")
+async def api_stocks_status():
+    return stocks.get_status()
+
+
+@app.get("/api/stocks/alerts")
+async def api_stocks_alerts(limit: int = 50):
+    return {"alerts": db.list_alerts(limit)}
+
+
+@app.get("/api/stocks/kline")
+async def api_stocks_kline(symbol: str, days: int = stocks.CHART_DAYS):
+    try:
+        symbol = sina_quotes.normalize_symbol(symbol)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"symbol": symbol, "bars": stocks.get_kline(symbol, days)}
+
+
+@app.post("/api/stocks/run")
+async def api_stocks_run():
+    if not stocks.trigger_manual_job():
+        return {"started": False, "message": "Job already running"}
+    return {"started": True, "message": "Job started in background"}
+
+
+@app.post("/api/stocks/add")
+async def api_stocks_add(req: StockAddRequest):
+    try:
+        symbol = sina_quotes.normalize_symbol(req.symbol)
+        name = req.name.strip() or stocks.resolve_name(symbol)
+        if not name:
+            raise HTTPException(status_code=400, detail=f"无法获取 {req.symbol} 的名称，请检查代码或手动填写")
+        stock = db.add_stock(symbol, name)
+        return {"success": True, "stock": stock}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/stocks/update")
+async def api_stocks_update(req: StockUpdateRequest):
+    try:
+        return {"success": True, "stock": db.update_stock(req.id, req.name, req.enabled)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/stocks/{stock_id}")
+async def api_stocks_delete(stock_id: int):
+    db.delete_stock(stock_id)
+    return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# Paper trading
+# ---------------------------------------------------------------------------
+
+
+class PaperTradeRequest(BaseModel):
+    symbol: str = Field(pattern=SYMBOL_PATTERN)
+    side: str = Field(pattern=r"^(buy|sell)$")
+    shares: int = Field(gt=0)
+
+
+class PaperCashRequest(BaseModel):
+    cash: float = Field(ge=0)
+
+
+class PaperSettingsRequest(BaseModel):
+    drift_tolerance_pct: float = Field(gt=0, le=1000)
+    min_trade_amount: Optional[float] = Field(default=None, ge=0)
+
+
+class PaperTargetRequest(BaseModel):
+    symbol: str = Field(pattern=SYMBOL_PATTERN)
+    target_weight: Optional[float] = Field(default=None, ge=0, le=100)
+
+
+class PaperCostRequest(BaseModel):
+    symbol: str = Field(pattern=SYMBOL_PATTERN)
+    avg_cost: float = Field(ge=0)
+
+
+class PaperSharesRequest(BaseModel):
+    symbol: str = Field(pattern=SYMBOL_PATTERN)
+    shares: int = Field(ge=0)
+
+
+@app.get("/paper", response_class=HTMLResponse)
+async def paper_page(request: Request):
+    return templates.TemplateResponse(request, "paper.html")
+
+
+@app.get("/api/paper/portfolio")
+async def api_paper_portfolio():
+    return paper.build_portfolio()
+
+
+@app.get("/api/paper/alerts")
+async def api_paper_alerts(limit: int = 50):
+    return {"alerts": db.list_paper_alerts(limit)}
+
+
+@app.get("/api/paper/rebalance")
+async def api_paper_rebalance():
+    return paper.plan_rebalance()
+
+
+@app.post("/api/paper/rebalance/execute")
+async def api_paper_rebalance_execute():
+    try:
+        return {"success": True, **paper.execute_rebalance()}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/paper/cash")
+async def api_paper_cash(req: PaperCashRequest):
+    try:
+        db.set_paper_cash(req.cash)
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/paper/settings")
+async def api_paper_settings(req: PaperSettingsRequest):
+    try:
+        db.set_paper_settings(req.drift_tolerance_pct, req.min_trade_amount)
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/paper/trade")
+async def api_paper_trade(req: PaperTradeRequest):
+    try:
+        return {"success": True, "trade": paper.trade(req.symbol, req.side, req.shares)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/paper/target")
+async def api_paper_target(req: PaperTargetRequest):
+    try:
+        paper.set_target(req.symbol, req.target_weight)
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/paper/cost")
+async def api_paper_cost(req: PaperCostRequest):
+    try:
+        db.set_paper_cost(req.symbol, req.avg_cost)
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/paper/shares")
+async def api_paper_shares(req: PaperSharesRequest):
+    """Set an absolute share count, trading the difference at the live price."""
+    try:
+        return {"success": True, "trade": paper.set_shares(req.symbol, req.shares)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/paper/position/{symbol}")
+async def api_paper_position_delete(symbol: str):
+    try:
+        db.delete_paper_position(sina_quotes.normalize_symbol(symbol))
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

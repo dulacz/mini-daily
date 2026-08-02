@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A股价格监�?- Mini Daily">
+    <title>股票监测 - Mini Daily</title>
+    <link rel="stylesheet" href="{{ static_url('style.css') }}">
+    <link rel="stylesheet" href="{{ static_url('newsfeed.css') }}">
+    <link rel="stylesheet" href="{{ static_url('stocks.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="{{ static_url('shared-utils.js') }}"></script>
+</head>
+
+<body class="dark-theme">
+    <!-- Navigation -->
+    <nav class="navigation">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1>Mini Daily</h1>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Daily Check-in</a>
+                <a href="/todo_coding" class="nav-link">Coding Problems</a>
+                <a href="/review_cards" class="nav-link">Anki</a>
+                {% if features.stocks %}<a href="/stocks" class="nav-link active">股票</a>{% endif %}
+                {% if features.paper %}<a href="/paper" class="nav-link">模拟�?/a>{% endif %}
+                    {% if features.newsfeed_s1 %}<a href="/newsfeed_s1" class="nav-link">S1 外野</a>{% endif %}
+                    {% if features.newsfeed_hn %}<a href="/newsfeed_hn" class="nav-link">Hacker News</a>{% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="newsfeed-container">
+        <header class="newsfeed-header">
+            <div class="newsfeed-header-content">
+                <h2 class="newsfeed-title">📈 A股价格监�?/h2>
+                    <p class="newsfeed-subtitle">每个交易日北京时�?14:30 �?15:05 各抓取一次；指标均基于前复权（分红再投）价格，RSI(12) �?1
+                        年分位突破区间时弹出系统通知
+                    </p>
+            </div>
+            <div class="newsfeed-meta">
+                <span class="meta-date" id="meta-date">加载中�?/span>
+                    <div class="meta-status-row">
+                        <button class="btn-refresh" id="btn-refresh" title="立即刷新">🔄 立即刷新</button>
+                        <span class="meta-status" id="meta-status"></span>
+                    </div>
+            </div>
+        </header>
+
+        <div class="action-bar">
+            <span class="action-hint" id="action-hint"></span>
+        </div>
+
+        <!-- Loading state -->
+        <div class="loading-state" id="loading-state">
+            <div class="spinner"></div>
+            <p>正在加载行情�?/p>
+        </div>
+
+        <!-- Shown only when the page fails to load data -->
+        <div class="empty-state" id="empty-state" style="display:none;">
+            <div class="empty-icon">📭</div>
+            <h3>加载失败</h3>
+            <p>无法读取自选列表，请刷新页面重试�?/p>
+        </div>
+
+        <!-- Watchlist -->
+        <div class="stocks-main" id="stocks-main" style="display:none;">
+            <section class="stocks-section">
+                <div class="section-head">
+                    <h3>警告区间 (全局)</h3>
+                    <span class="action-hint">对所有自选生效，修改后回车即时生效；留空则不监测那一�?/span>
+                </div>
+                <div class="settings-form">
+                    <label>RSI 超买�?
+                        <input type="number" id="set-rsi-high" step="1" min="0" max="100" autocomplete="off">
+                    </label>
+                    <label>RSI 超卖�?
+                        <input type="number" id="set-rsi-low" step="1" min="0" max="100" autocomplete="off">
+                    </label>
+                    <label>高分位线 % (1 年全收益)
+                        <input type="number" id="set-pct-high" step="1" min="0" max="100" autocomplete="off">
+                    </label>
+                    <label>低分位线 % (1 年全收益)
+                        <input type="number" id="set-pct-low" step="1" min="0" max="100" autocomplete="off">
+                    </label>
+                    <span class="modal-error" id="settings-error"></span>
+                </div>
+            </section>
+
+            <section class="stocks-section">
+                <div class="section-head">
+                    <h3>自选列�?/h3>
+                        <button class="btn-refresh" id="btn-add">�?添加股票</button>
+                </div>
+                <div class="table-wrap">
+                    <table class="stocks-table">
+                        <thead>
+                            <tr>
+                                <th>代码</th>
+                                <th>名称</th>
+                                <th class="num">现价</th>
+                                <th class="num">涨跌�?/th>
+                                <th class="num">RSI(12)</th>
+                                <th class="num">分位1�?(全收�?</th>
+                                <th class="num">成交�?�?</th>
+                                <th>走势 (前复权，灰线=MA250)</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stocks-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="stocks-section">
+                <div class="section-head">
+                    <h3>警告历史</h3>
+                </div>
+                <div class="table-wrap">
+                    <table class="stocks-table">
+                        <thead>
+                            <tr>
+                                <th>交易�?/th>
+                                <th>名称</th>
+                                <th>方向</th>
+                                <th class="num">触发�?/th>
+                                <th class="num">阈�?/th>
+                                <th>触发时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alerts-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Add / edit dialog -->
+    <div class="stock-modal" id="stock-modal" style="display:none;">
+        <div class="stock-modal-card">
+            <h3 id="modal-title">添加股票</h3>
+            <label>代码
+                <input type="text" id="field-symbol" placeholder="600519" autocomplete="off">
+            </label>
+            <label>名称
+                <input type="text" id="field-name" placeholder="留空则自动获�? autocomplete=" off">
+            </label>
+            <p class="modal-error" id="modal-error"></p>
+            <div class="modal-actions">
+                <button class="btn-refresh" id="modal-cancel">取消</button>
+                <button class="btn-refresh btn-primary" id="modal-save">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ static_url('stocks.js') }}"></script>
+</body>
+
+</html>

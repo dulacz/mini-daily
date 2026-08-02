@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="模拟盘 - Mini Daily">
+    <title>模拟盘 - Mini Daily</title>
+    <link rel="stylesheet" href="{{ static_url('style.css') }}">
+    <link rel="stylesheet" href="{{ static_url('newsfeed.css') }}">
+    <link rel="stylesheet" href="{{ static_url('stocks.css') }}">
+    <link rel="stylesheet" href="{{ static_url('paper.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="{{ static_url('shared-utils.js') }}"></script>
+</head>
+
+<body class="dark-theme">
+    <!-- Navigation -->
+    <nav class="navigation">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1>Mini Daily</h1>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Daily Check-in</a>
+                <a href="/todo_coding" class="nav-link">Coding Problems</a>
+                <a href="/review_cards" class="nav-link">Anki</a>
+                {% if features.stocks %}<a href="/stocks" class="nav-link">股票</a>{% endif %}
+                {% if features.paper %}<a href="/paper" class="nav-link active">模拟盘</a>{% endif %}
+                {% if features.newsfeed_s1 %}<a href="/newsfeed_s1" class="nav-link">S1 外野</a>{% endif %}
+                {% if features.newsfeed_hn %}<a href="/newsfeed_hn" class="nav-link">Hacker News</a>{% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="newsfeed-container">
+        <header class="newsfeed-header">
+            <div class="newsfeed-header-content">
+                <h2 class="newsfeed-title">💼 模拟盘</h2>
+                <p class="newsfeed-subtitle">虚拟买卖 A 股，跟踪持仓盈亏与目标权重；权重漂移超容差时在 14:30 / 15:05 弹出系统通知</p>
+            </div>
+            <div class="newsfeed-meta">
+                <span class="meta-date" id="meta-total">总资产 —</span>
+                <div class="meta-status-row">
+                    <button class="btn-refresh" id="btn-refresh" title="刷新行情">🔄 刷新</button>
+                    <span class="meta-status" id="meta-status"></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Summary cards -->
+        <div class="summary-grid" id="summary-grid">
+            <div class="summary-card">
+                <span class="summary-label">总资产</span>
+                <span class="summary-value" id="sum-total">—</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">现金</span>
+                <input class="summary-input" type="number" id="field-cash" step="0.01" min="0" autocomplete="off"
+                    title="直接修改，回车或移开焦点即时生效">
+                <span class="summary-sub" id="sum-cash-weight"></span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">持仓市值</span>
+                <span class="summary-value" id="sum-market">—</span>
+                <span class="summary-sub" id="sum-market-weight"></span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">浮动盈亏</span>
+                <span class="summary-value" id="sum-unrealized">—</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-label">已实现盈亏</span>
+                <span class="summary-value" id="sum-realized">—</span>
+            </div>
+        </div>
+
+        <!-- Trade + settings panel -->
+        <section class="stocks-section">
+            <div class="section-head">
+                <h3>下单</h3>
+                <span class="action-hint" id="trade-hint">成交价按下单时的新浪实时报价</span>
+            </div>
+            <div class="trade-form">
+                <label>代码
+                    <input type="text" id="trade-symbol" placeholder="600519" autocomplete="off">
+                </label>
+                <label>方向
+                    <select id="trade-side">
+                        <option value="buy">买入</option>
+                        <option value="sell">卖出</option>
+                    </select>
+                </label>
+                <label>数量 (股)
+                    <input type="number" id="trade-shares" step="100" min="1" placeholder="100" autocomplete="off">
+                </label>
+                <button class="btn-refresh btn-primary" id="btn-trade">提交</button>
+                <span class="modal-error" id="trade-error"></span>
+            </div>
+
+            <div class="settings-form">
+                <label>漂移容差 % (相对目标)
+                    <input type="number" id="field-tolerance" step="1" min="1" autocomplete="off">
+                </label>
+                <label>最小调仓金额
+                    <input type="number" id="field-min-trade" step="100" min="0" autocomplete="off">
+                </label>
+                <span class="modal-error" id="settings-error"></span>
+            </div>
+        </section>
+
+        <!-- Positions -->
+        <section class="stocks-section">
+            <div class="section-head">
+                <h3>持仓</h3>
+                <div class="row-actions">
+                    <span class="action-hint" id="rebalance-summary"></span>
+                    <button class="btn-refresh btn-primary" id="btn-rebalance">一键执行再平衡</button>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table class="stocks-table">
+                    <thead>
+                        <tr>
+                            <th>代码</th>
+                            <th>名称</th>
+                            <th class="num">数量</th>
+                            <th class="num">现价</th>
+                            <th class="num">成本价</th>
+                            <th class="num">市值</th>
+                            <th class="num">累计盈亏</th>
+                            <th class="num">收益率</th>
+                            <th class="num">占比</th>
+                            <th class="num">目标</th>
+                            <th class="num">漂移</th>
+                            <th>再平衡</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="positions-tbody"></tbody>
+                    <tfoot id="positions-tfoot"></tfoot>
+                </table>
+            </div>
+        </section>
+
+        <!-- Drift alerts -->
+        <section class="stocks-section">
+            <div class="section-head">
+                <h3>漂移警告</h3>
+            </div>
+            <div class="table-wrap">
+                <table class="stocks-table">
+                    <thead>
+                        <tr>
+                            <th>交易日</th>
+                            <th>名称</th>
+                            <th>方向</th>
+                            <th class="num">实际占比</th>
+                            <th class="num">目标占比</th>
+                            <th class="num">偏离</th>
+                            <th>触发时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alerts-tbody"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script src="{{ static_url('paper.js') }}"></script>
+</body>
+
+</html>

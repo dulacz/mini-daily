@@ -30,7 +30,8 @@
                 <a href="/" class="nav-link">Daily Check-in</a>
                 <a href="/todo_coding" class="nav-link">Coding Problems</a>
                 <a href="/review_cards" class="nav-link active">Anki</a>
-                <a href="/worldcup-flag-quiz" class="nav-link">Flag Quiz</a>
+                {% if features.stocks %}<a href="/stocks" class="nav-link">股票</a>{% endif %}
+                {% if features.paper %}<a href="/paper" class="nav-link">模拟盘</a>{% endif %}
                 {% if features.newsfeed_s1 %}<a href="/newsfeed_s1" class="nav-link">S1 外野</a>{% endif %}
                 {% if features.newsfeed_hn %}<a href="/newsfeed_hn" class="nav-link">Hacker News</a>{% endif %}
             </div>

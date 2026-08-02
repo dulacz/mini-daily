@@ -1,0 +1,177 @@
+/* Paper trading page — layered on top of style.css + newsfeed.css + stocks.css */
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 0.9rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.summary-label {
+    font-size: 0.78rem;
+    color: #9ca3af;
+    letter-spacing: 0.03em;
+}
+
+.summary-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #e5e7eb;
+    font-variant-numeric: tabular-nums;
+}
+
+.summary-input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 0.15rem 0.45rem;
+    width: 100%;
+    color: #e5e7eb;
+    font-size: 1.25rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.summary-input:focus {
+    outline: none;
+    border-color: #6366f1;
+}
+
+.summary-sub {
+    font-size: 0.78rem;
+    color: #6b7280;
+}
+
+.trade-form,
+.settings-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.85rem;
+}
+
+.settings-form {
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.trade-form label,
+.settings-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    color: #9ca3af;
+}
+
+.trade-form input,
+.trade-form select,
+.settings-form input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 0.45rem 0.6rem;
+    color: #e5e7eb;
+    font-size: 0.92rem;
+    min-width: 150px;
+}
+
+.trade-form input:focus,
+.trade-form select:focus,
+.settings-form input:focus {
+    outline: none;
+    border-color: #6366f1;
+}
+
+.stocks-section+.stocks-section {
+    margin-top: 2rem;
+}
+
+.weight-bar {
+    position: relative;
+    display: inline-block;
+    width: 70px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+
+.weight-bar span {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: 3px;
+    background: #6366f1;
+}
+
+.row-drifted {
+    background: rgba(251, 191, 36, 0.12);
+}
+
+/* Direction supplies the colour, so exceeding tolerance is marked by weight only. */
+.drifted {
+    font-weight: 600;
+}
+
+.btn-icon {
+    width: 26px;
+    padding: 0.25rem 0;
+    line-height: 1;
+    font-size: 1rem;
+}
+
+.totals-row td {
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.cell-input {
+    width: 110px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    /* Extra right padding keeps the right-aligned value clear of the spinner arrows. */
+    padding: 0.2rem 1.3rem 0.2rem 0.4rem;
+    color: #e5e7eb;
+    font-size: 0.85rem;
+    text-align: right;
+}
+
+.cell-input:focus {
+    outline: none;
+    border-color: #6366f1;
+}
+
+/* .btn-mini sets its own colour and is declared after .up/.down, so orders need their own tint. */
+.btn-order.buy {
+    color: #fca5a5;
+    border-color: rgba(248, 113, 113, 0.45);
+    background: rgba(248, 113, 113, 0.14);
+}
+
+.btn-order.buy:hover {
+    background: rgba(248, 113, 113, 0.26);
+}
+
+.btn-order.sell {
+    color: #86efac;
+    border-color: rgba(74, 222, 128, 0.45);
+    background: rgba(74, 222, 128, 0.14);
+}
+
+.btn-order.sell:hover {
+    background: rgba(74, 222, 128, 0.26);
+}
