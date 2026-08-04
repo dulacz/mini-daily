@@ -658,6 +658,23 @@ def _validate_symbol(symbol: str) -> str:
 DEFAULT_ALERT_SETTINGS = {"rsi_high": 70.0, "rsi_low": 30.0, "pct_high": 90.0, "pct_low": 10.0}
 
 
+def _add_episode_columns(conn, table: str):
+    """Back-fill the episode columns on alert tables created before they existed."""
+    columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if "last_date" not in columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN last_date TEXT")
+        conn.execute(f"UPDATE {table} SET last_date = trade_date WHERE last_date IS NULL")
+    if "days" not in columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN days INTEGER NOT NULL DEFAULT 1")
+
+
+def _add_daily_raw_column(conn):
+    """Back-fill the unadjusted close on stock_daily tables created before it existed."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(stock_daily)")}
+    if "close_raw" not in columns:
+        conn.execute("ALTER TABLE stock_daily ADD COLUMN close_raw REAL")
+
+
 def init_stocks():
     """Create the stock tables and seed the watchlist from data/stocks.yaml."""
     with get_conn() as conn:
@@ -680,9 +697,12 @@ def init_stocks():
                 price REAL NOT NULL,
                 threshold REAL NOT NULL,
                 triggered_at TEXT NOT NULL,
+                last_date TEXT,
+                days INTEGER NOT NULL DEFAULT 1,
                 UNIQUE(symbol, trade_date, direction)
             )
             """)
+        _add_episode_columns(conn, "stock_alerts")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS stock_daily (
                 symbol TEXT NOT NULL,
@@ -692,9 +712,11 @@ def init_stocks():
                 low REAL,
                 close REAL NOT NULL,
                 volume INTEGER,
+                close_raw REAL,
                 PRIMARY KEY (symbol, day)
             )
             """)
+        _add_daily_raw_column(conn)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS app_meta (
                 key TEXT PRIMARY KEY,
@@ -888,9 +910,19 @@ def replace_daily_bars(symbol: str, bars: List[Dict]):
     with get_conn() as conn:
         conn.execute("DELETE FROM stock_daily WHERE symbol = ?", (symbol,))
         conn.executemany(
-            "INSERT INTO stock_daily (symbol, day, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO stock_daily (symbol, day, open, high, low, close, volume, close_raw) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [
-                (symbol, b["day"], b.get("open"), b.get("high"), b.get("low"), b["close"], b.get("volume"))
+                (
+                    symbol,
+                    b["day"],
+                    b.get("open"),
+                    b.get("high"),
+                    b.get("low"),
+                    b["close"],
+                    b.get("volume"),
+                    b.get("close_raw"),
+                )
                 for b in bars
                 if b.get("day") and b.get("close")
             ],
@@ -901,36 +933,66 @@ def get_daily_bars(symbol: str, limit: int = 120) -> List[Dict]:
     """Return the most recent stored daily bars, oldest first."""
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT day, open, high, low, close, volume FROM stock_daily WHERE symbol = ? ORDER BY day DESC LIMIT ?",
+            "SELECT day, open, high, low, close, volume, close_raw FROM stock_daily "
+            "WHERE symbol = ? ORDER BY day DESC LIMIT ?",
             (symbol, max(1, int(limit))),
         ).fetchall()
     return [
-        {"day": r[0], "open": r[1], "high": r[2], "low": r[3], "close": r[4], "volume": r[5]}
+        {"day": r[0], "open": r[1], "high": r[2], "low": r[3], "close": r[4], "volume": r[5], "close_raw": r[6]}
         for r in reversed(rows)
     ]
 
 
 def record_alert(symbol: str, name: str, trade_date: str, direction: str, price: float, threshold: float) -> bool:
-    """Store an alert. Returns False when this symbol/date/direction already fired."""
+    """Open an alert episode. Returns False when this symbol/date/direction already fired."""
     with get_conn() as conn:
         cursor = conn.execute(
             """
-            INSERT OR IGNORE INTO stock_alerts (symbol, name, trade_date, direction, price, threshold, triggered_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT OR IGNORE INTO stock_alerts
+                (symbol, name, trade_date, direction, price, threshold, triggered_at, last_date, days)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
             """,
-            (symbol, name, trade_date, direction, price, threshold, datetime.now(APP_TZ).isoformat(timespec="seconds")),
+            (
+                symbol,
+                name,
+                trade_date,
+                direction,
+                price,
+                threshold,
+                datetime.now(APP_TZ).isoformat(timespec="seconds"),
+                trade_date,
+            ),
         )
         return cursor.rowcount > 0
 
 
+def extend_alert(symbol: str, direction: str, trade_date: str) -> bool:
+    """Grow the newest episode to cover another trading day."""
+    return _extend_episode("stock_alerts", symbol, direction, trade_date)
+
+
+def _extend_episode(table: str, symbol: str, direction: str, trade_date: str) -> bool:
+    with get_conn() as conn:
+        row = conn.execute(
+            f"SELECT id, last_date, days FROM {table} WHERE symbol = ? AND direction = ? "
+            "ORDER BY trade_date DESC, id DESC LIMIT 1",
+            (symbol, direction),
+        ).fetchone()
+        if row is None or row[1] == trade_date:
+            return False
+        conn.execute(f"UPDATE {table} SET last_date = ?, days = ? WHERE id = ?", (trade_date, row[2] + 1, row[0]))
+        return True
+
+
 def list_alerts(limit: int = 50) -> List[Dict]:
-    """Return the most recently triggered alerts."""
+    """Most recent alerts, skipping symbols that have since left the watchlist."""
     limit = max(1, min(int(limit), 500))
     with get_conn() as conn:
         cursor = conn.execute(
             """
-            SELECT symbol, name, trade_date, direction, price, threshold, triggered_at
+            SELECT symbol, name, trade_date, direction, price, threshold, triggered_at, last_date, days
             FROM stock_alerts
+            WHERE EXISTS (SELECT 1 FROM stocks WHERE stocks.symbol = stock_alerts.symbol)
             ORDER BY trade_date DESC, triggered_at DESC
             LIMIT ?
             """,
@@ -946,6 +1008,8 @@ def list_alerts(limit: int = 50) -> List[Dict]:
                 "price": row[4],
                 "threshold": row[5],
                 "triggered_at": row[6],
+                "last_date": row[7] or row[2],
+                "days": row[8],
             }
             for row in cursor.fetchall()
         ]
@@ -975,7 +1039,6 @@ def init_paper():
                 name TEXT NOT NULL,
                 shares INTEGER NOT NULL DEFAULT 0,
                 cost_total REAL NOT NULL DEFAULT 0,
-                realized_pnl REAL NOT NULL DEFAULT 0,
                 target_weight REAL
             )
             """)
@@ -990,9 +1053,12 @@ def init_paper():
                 target_pct REAL NOT NULL,
                 drift_pct REAL NOT NULL,
                 triggered_at TEXT NOT NULL,
+                last_date TEXT,
+                days INTEGER NOT NULL DEFAULT 1,
                 UNIQUE(symbol, trade_date, direction)
             )
             """)
+        _add_episode_columns(conn, "paper_alerts")
         conn.execute(
             "INSERT OR IGNORE INTO paper_account (id, cash, drift_tolerance_pct) VALUES (1, 0, ?)",
             (DEFAULT_DRIFT_TOLERANCE_PCT,),
@@ -1002,31 +1068,69 @@ def init_paper():
             conn.execute(
                 f"ALTER TABLE paper_account ADD COLUMN min_trade_amount REAL NOT NULL DEFAULT {DEFAULT_MIN_TRADE_AMOUNT}"
             )
+        position_columns = {row[1] for row in conn.execute("PRAGMA table_info(paper_positions)")}
+        if "realized_pnl" in position_columns:
+            conn.execute("ALTER TABLE paper_positions DROP COLUMN realized_pnl")
+        account_columns = {row[1] for row in conn.execute("PRAGMA table_info(paper_account)")}
+        if "net_deposit" not in account_columns:
+            conn.execute("ALTER TABLE paper_account ADD COLUMN net_deposit REAL NOT NULL DEFAULT 0")
+            # Existing accounts start even: everything paid in so far is cash plus what holdings cost.
+            conn.execute(
+                "UPDATE paper_account SET net_deposit = cash + "
+                "COALESCE((SELECT SUM(cost_total) FROM paper_positions), 0) WHERE id = 1"
+            )
+        if "drift_enabled" not in account_columns:
+            conn.execute("ALTER TABLE paper_account ADD COLUMN drift_enabled INTEGER NOT NULL DEFAULT 1")
         conn.execute("DROP TABLE IF EXISTS paper_trades")
 
 
 def get_paper_account() -> Dict:
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT cash, drift_tolerance_pct, min_trade_amount FROM paper_account WHERE id = 1"
+            "SELECT cash, drift_tolerance_pct, min_trade_amount, net_deposit, drift_enabled "
+            "FROM paper_account WHERE id = 1"
         ).fetchone()
     if row is None:
         return {
             "cash": 0.0,
             "drift_tolerance_pct": DEFAULT_DRIFT_TOLERANCE_PCT,
             "min_trade_amount": DEFAULT_MIN_TRADE_AMOUNT,
+            "net_deposit": 0.0,
+            "drift_enabled": True,
         }
-    return {"cash": row[0], "drift_tolerance_pct": row[1], "min_trade_amount": row[2]}
+    return {
+        "cash": row[0],
+        "drift_tolerance_pct": row[1],
+        "min_trade_amount": row[2],
+        "net_deposit": row[3],
+        "drift_enabled": bool(row[4]),
+    }
 
 
 def set_paper_cash(cash: float):
+    """Editing cash by hand means money moved in or out, so the deposit baseline moves with it."""
     if cash < 0:
         raise ValueError("现金不能为负数")
     with get_conn() as conn:
-        conn.execute("UPDATE paper_account SET cash = ? WHERE id = 1", (float(cash),))
+        current = conn.execute("SELECT cash, net_deposit FROM paper_account WHERE id = 1").fetchone()
+        delta = float(cash) - current[0]
+        conn.execute(
+            "UPDATE paper_account SET cash = ?, net_deposit = ? WHERE id = 1",
+            (float(cash), round(current[1] + delta, 2)),
+        )
 
 
-def set_paper_settings(drift_tolerance_pct: float, min_trade_amount: Optional[float] = None):
+def set_paper_net_deposit(net_deposit: float):
+    """Correct the deposit baseline without touching cash."""
+    with get_conn() as conn:
+        conn.execute("UPDATE paper_account SET net_deposit = ? WHERE id = 1", (round(float(net_deposit), 2),))
+
+
+def set_paper_settings(
+    drift_tolerance_pct: float,
+    min_trade_amount: Optional[float] = None,
+    drift_enabled: Optional[bool] = None,
+):
     if drift_tolerance_pct <= 0:
         raise ValueError("漂移容差必须大于 0")
     if min_trade_amount is not None and min_trade_amount < 0:
@@ -1035,13 +1139,15 @@ def set_paper_settings(drift_tolerance_pct: float, min_trade_amount: Optional[fl
         conn.execute("UPDATE paper_account SET drift_tolerance_pct = ? WHERE id = 1", (float(drift_tolerance_pct),))
         if min_trade_amount is not None:
             conn.execute("UPDATE paper_account SET min_trade_amount = ? WHERE id = 1", (float(min_trade_amount),))
+        if drift_enabled is not None:
+            conn.execute("UPDATE paper_account SET drift_enabled = ? WHERE id = 1", (int(drift_enabled),))
 
 
 def list_paper_positions() -> List[Dict]:
     with get_conn() as conn:
         cursor = conn.execute(
             """
-            SELECT symbol, name, shares, cost_total, realized_pnl, target_weight
+            SELECT symbol, name, shares, cost_total, target_weight
             FROM paper_positions ORDER BY substr(symbol, 3), symbol
             """
         )
@@ -1052,8 +1158,7 @@ def list_paper_positions() -> List[Dict]:
                 "name": row[1],
                 "shares": row[2],
                 "cost_total": row[3],
-                "realized_pnl": row[4],
-                "target_weight": row[5],
+                "target_weight": row[4],
             }
             for row in cursor.fetchall()
         ]
@@ -1073,9 +1178,9 @@ def record_paper_trade(symbol: str, name: str, side: str, shares: int, price: fl
     with get_conn() as conn:
         cash = conn.execute("SELECT cash FROM paper_account WHERE id = 1").fetchone()[0]
         row = conn.execute(
-            "SELECT shares, cost_total, realized_pnl FROM paper_positions WHERE symbol = ?", (symbol,)
+            "SELECT shares, cost_total FROM paper_positions WHERE symbol = ?", (symbol,)
         ).fetchone()
-        held, cost_total, realized = row if row else (0, 0.0, 0.0)
+        held, cost_total = row if row else (0, 0.0)
 
         if side == "buy":
             if amount > cash:
@@ -1086,21 +1191,18 @@ def record_paper_trade(symbol: str, name: str, side: str, shares: int, price: fl
         else:
             if shares > held:
                 raise ValueError(f"持股不足：需要 {shares} 股，持有 {held} 股")
-            avg_cost = cost_total / held
-            realized = round(realized + amount - avg_cost * shares, 2)
-            cost_total = round(cost_total - avg_cost * shares, 2)
+            cost_total = round(cost_total - cost_total / held * shares, 2)
             held -= shares
             cash = round(cash + amount, 2)
 
         conn.execute(
             """
-            INSERT INTO paper_positions (symbol, name, shares, cost_total, realized_pnl)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO paper_positions (symbol, name, shares, cost_total)
+            VALUES (?, ?, ?, ?)
             ON CONFLICT(symbol) DO UPDATE SET
-                name = excluded.name, shares = excluded.shares,
-                cost_total = excluded.cost_total, realized_pnl = excluded.realized_pnl
+                name = excluded.name, shares = excluded.shares, cost_total = excluded.cost_total
             """,
-            (symbol, name or symbol, held, cost_total, realized),
+            (symbol, name or symbol, held, cost_total),
         )
         conn.execute("UPDATE paper_account SET cash = ? WHERE id = 1", (cash,))
 
@@ -1125,7 +1227,7 @@ def set_paper_target_weight(symbol: str, target_weight: Optional[float], name: O
             if not name:
                 raise ValueError(f"持仓中没有 {bare_code(symbol)}")
             conn.execute(
-                "INSERT INTO paper_positions (symbol, name, shares, cost_total, realized_pnl) VALUES (?, ?, 0, 0, 0)",
+                "INSERT INTO paper_positions (symbol, name, shares, cost_total) VALUES (?, ?, 0, 0)",
                 (symbol, name),
             )
         conn.execute("UPDATE paper_positions SET target_weight = ? WHERE symbol = ?", (target_weight, symbol))
@@ -1163,13 +1265,13 @@ def set_paper_cost(symbol: str, avg_cost: float):
 def record_paper_alert(
     symbol: str, name: str, trade_date: str, direction: str, weight_pct: float, target_pct: float, drift_pct: float
 ) -> bool:
-    """Store a drift alert. Returns False when this symbol/date/direction already fired."""
+    """Open a drift episode. Returns False when this symbol/date/direction already fired."""
     with get_conn() as conn:
         cursor = conn.execute(
             """
             INSERT OR IGNORE INTO paper_alerts
-                (symbol, name, trade_date, direction, weight_pct, target_pct, drift_pct, triggered_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (symbol, name, trade_date, direction, weight_pct, target_pct, drift_pct, triggered_at, last_date, days)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             """,
             (
                 symbol,
@@ -1180,18 +1282,28 @@ def record_paper_alert(
                 target_pct,
                 drift_pct,
                 datetime.now(APP_TZ).isoformat(timespec="seconds"),
+                trade_date,
             ),
         )
         return cursor.rowcount > 0
 
 
+def extend_paper_alert(symbol: str, direction: str, trade_date: str) -> bool:
+    """Grow the newest drift episode to cover another trading day."""
+    return _extend_episode("paper_alerts", symbol, direction, trade_date)
+
+
 def list_paper_alerts(limit: int = 50) -> List[Dict]:
+    """Most recent drift alerts, skipping holdings that have since been removed."""
     limit = max(1, min(int(limit), 500))
     with get_conn() as conn:
         cursor = conn.execute(
             """
-            SELECT symbol, name, trade_date, direction, weight_pct, target_pct, drift_pct, triggered_at
-            FROM paper_alerts ORDER BY trade_date DESC, triggered_at DESC LIMIT ?
+            SELECT symbol, name, trade_date, direction, weight_pct, target_pct, drift_pct, triggered_at,
+                   last_date, days
+            FROM paper_alerts
+            WHERE EXISTS (SELECT 1 FROM paper_positions WHERE paper_positions.symbol = paper_alerts.symbol)
+            ORDER BY trade_date DESC, triggered_at DESC LIMIT ?
             """,
             (limit,),
         )
@@ -1205,6 +1317,8 @@ def list_paper_alerts(limit: int = 50) -> List[Dict]:
                 "target_pct": row[5],
                 "drift_pct": row[6],
                 "triggered_at": row[7],
+                "last_date": row[8] or row[2],
+                "days": row[9],
             }
             for row in cursor.fetchall()
         ]

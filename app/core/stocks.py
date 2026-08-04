@@ -110,18 +110,51 @@ def moving_average(closes: list[float], period: int) -> list[Optional[float]]:
     return out
 
 
-def _refresh_metrics(symbol: str, price: float) -> dict:
+def distribution_yield_series(bars: list[dict], window: int = PERCENTILE_WINDOW) -> list[float]:
+    """Trailing distribution yield in percent, one value per day once the window is full.
+
+    The adjusted series reinvests distributions while the raw one does not, so the gap
+    between their returns over the window is what the fund actually paid out. This is the
+    fund's own payout, not the underlying index yield: an accumulating ETF reads ~0.
+    """
+    out = []
+    for i in range(window, len(bars)):
+        now, then = bars[i], bars[i - window]
+        if not (now.get("close") and now.get("close_raw") and then.get("close") and then.get("close_raw")):
+            continue
+        total_return = now["close"] / then["close"]
+        price_return = now["close_raw"] / then["close_raw"]
+        out.append((total_return / price_return - 1) * 100)
+    return out
+
+
+def _refresh_metrics(symbol: str, price: float, trade_date: str = "") -> dict:
     """Refresh the stored daily bars and return the derived indicators."""
     bars, adjusted = kline.fetch_daily_bars(symbol, KLINE_HISTORY_DAYS)
     if bars:
         # Forward adjustment rescales the whole history on every dividend, so the
         # series has to be replaced wholesale rather than merged with older values.
         db.replace_daily_bars(symbol, bars)
-    closes = [b["close"] for b in db.get_daily_bars(symbol, limit=KLINE_HISTORY_DAYS) if b["close"]]
+    stored = db.get_daily_bars(symbol, limit=KLINE_HISTORY_DAYS)
+    closes = [b["close"] for b in stored if b["close"]]
+    # The raw closes are kept only to infer what the fund paid out; every indicator
+    # below runs on the adjusted series.
+    yields = distribution_yield_series(stored)
+    div_yield = yields[-1] if yields else None
+
+    # Both sides come from the stored bars so the ratio is unit-free: Tencent reports lots
+    # while the Sina fallback reports shares, and the live quote uses shares either way.
+    volumes = [(b["day"], b["volume"]) for b in stored if b.get("volume")]
+    volume_ratio = None
+    if len(volumes) >= 2 and volumes[-2][1] and (not trade_date or volumes[-1][0] == trade_date):
+        volume_ratio = volumes[-1][1] / volumes[-2][1]
 
     return {
         "rsi": compute_rsi(closes),
         "pct_1y": compute_percentile(closes[-PERCENTILE_WINDOW:], price),
+        "div_yield": div_yield,
+        "div_yield_pct": compute_percentile(yields, div_yield) if div_yield is not None else None,
+        "volume_ratio": volume_ratio,
         "adjusted": adjusted if bars else None,
     }
 
@@ -168,6 +201,12 @@ def run_job(slot: str = "manual") -> dict:
         except Exception as e:
             print(f"[Stocks] Quote fetch failed: {e}")
 
+    # A failed fetch must not blank the page: fall back to the last known good quote per symbol.
+    previous = load_snapshot().get("quotes", {})
+    for symbol, quote in previous.items():
+        if quote.get("valid") and not (quotes.get(symbol) or {}).get("valid"):
+            quotes[symbol] = quote
+
     valid = {sym: q for sym, q in quotes.items() if q.get("valid")}
     # Sina reports the last trading day, so a stale date means today is not a trading day.
     trade_date = next((q["date"] for q in valid.values() if q.get("date")), "")
@@ -177,7 +216,7 @@ def run_job(slot: str = "manual") -> dict:
     for stock in stocks:
         symbol = stock["symbol"]
         try:
-            metrics_by_symbol[symbol] = _refresh_metrics(symbol, (valid.get(symbol) or {}).get("price", 0.0))
+            metrics_by_symbol[symbol] = _refresh_metrics(symbol, (valid.get(symbol) or {}).get("price", 0.0), trade_date)
         except Exception as e:
             print(f"[Stocks] Daily bar refresh failed for {symbol}: {e}")
             metrics_by_symbol[symbol] = {}
@@ -200,6 +239,7 @@ def run_job(slot: str = "manual") -> dict:
             "runs_done": runs_done,
             "quotes": quotes,
             "metrics": metrics_by_symbol,
+            "active_alerts": snapshot.get("active_alerts", []),
         }
     )
 
@@ -207,40 +247,109 @@ def run_job(slot: str = "manual") -> dict:
         print(f"[Stocks] Quote date {trade_date or '(unknown)'} != {beijing_date} — not a trading day, no alerts.")
         return {"trade_date": trade_date, "alerts": [], "drift_alerts": []}
 
-    new_alerts = []
+    breaches = []
     settings = db.get_alert_settings()
     for stock in stocks:
         quote = valid.get(stock["symbol"])
         if not quote:
             continue
         for breach in _evaluate(metrics_by_symbol.get(stock["symbol"], {}), settings):
-            if db.record_alert(
-                symbol=stock["symbol"],
-                name=stock["name"],
-                trade_date=trade_date,
-                direction=breach["direction"],
-                price=breach["value"],
-                threshold=breach["threshold"],
-            ):
-                new_alerts.append({**breach, "name": stock["name"], "symbol": stock["symbol"]})
+            breaches.append({**breach, "name": stock["name"], "symbol": stock["symbol"]})
 
     try:
-        drift_alerts = paper.check_drift(trade_date, quotes)
+        drift_alerts = paper.drifted_holdings(quotes)
     except Exception as e:
         print(f"[Stocks] Drift check failed: {e}")
         drift_alerts = []
 
-    lines = [_alert_line(a) for a in new_alerts] + [paper.alert_line(a) for a in drift_alerts]
+    # Edge-triggered: a condition that was already breaching on the previous run stays quiet,
+    # so a stock parked above the RSI band does not toast every single day.
+    was_active = set(snapshot.get("active_alerts", []))
+    active = {_alert_key(a) for a in breaches} | {_alert_key(a) for a in drift_alerts}
+    new_alerts = [a for a in breaches if _alert_key(a) not in was_active]
+    new_drift = [a for a in drift_alerts if _alert_key(a) not in was_active]
+    _persist_alerts(breaches, drift_alerts, trade_date, was_active)
+    _save_snapshot({**load_snapshot(), "active_alerts": sorted(active)})
+
+    lines = [_alert_line(a) for a in new_alerts] + [paper.alert_line(a) for a in new_drift]
     if lines:
         notify.send_toast(f"股价提醒 · {trade_date}", lines)
         print(f"[Stocks] {len(lines)} new alert(s): {'; '.join(lines)}")
     else:
-        print("[Stocks] No new alerts.")
+        print(f"[Stocks] No new alerts ({len(active)} still active).")
 
-    return {"trade_date": trade_date, "alerts": new_alerts, "drift_alerts": drift_alerts}
+    return {"trade_date": trade_date, "alerts": new_alerts, "drift_alerts": new_drift}
+
+
+def _alert_key(alert: dict) -> str:
+    return f"{alert['symbol']}|{alert['direction']}"
+
+
+def _persist_alerts(breaches: list[dict], drift: list[dict], trade_date: str, was_active: set):
+    """Open an episode for a fresh breach, or stretch the running one by another trading day."""
+    for alert in breaches:
+        if _alert_key(alert) in was_active:
+            db.extend_alert(alert["symbol"], alert["direction"], trade_date)
+        else:
+            db.record_alert(
+                symbol=alert["symbol"],
+                name=alert["name"],
+                trade_date=trade_date,
+                direction=alert["direction"],
+                price=alert["value"],
+                threshold=alert["threshold"],
+            )
+    for alert in drift:
+        if _alert_key(alert) in was_active:
+            db.extend_paper_alert(alert["symbol"], alert["direction"], trade_date)
+        else:
+            db.record_paper_alert(
+                symbol=alert["symbol"],
+                name=alert["name"],
+                trade_date=trade_date,
+                direction=alert["direction"],
+                weight_pct=alert["weight_pct"],
+                target_pct=alert["target_pct"],
+                drift_pct=alert["drift_pct"],
+            )
 
 
 _ALERT_LABELS = {"rsi_high": "RSI ", "rsi_low": "RSI ", "pct_high": "分位 ", "pct_low": "分位 "}
+
+TEST_TOAST_MAX_LINES = 8
+
+
+def run_alert_test() -> dict:
+    """Toast and record whatever is breaching right now, without waiting for a scheduled slot."""
+    snapshot = load_snapshot()
+    metrics = snapshot.get("metrics", {})
+    quotes = snapshot.get("quotes", {})
+    trade_date = snapshot.get("trade_date") or _beijing_now().date().isoformat()
+    settings = db.get_alert_settings()
+
+    lines = []
+    breaches = []
+    for stock in db.list_stocks(enabled_only=True):
+        for breach in _evaluate(metrics.get(stock["symbol"], {}), settings):
+            breaches.append({**breach, "name": stock["name"], "symbol": stock["symbol"]})
+            lines.append(_alert_line({**breach, "name": stock["name"]}))
+
+    drift = paper.drifted_holdings(quotes)
+    lines += [paper.alert_line(a) for a in drift]
+    _persist_alerts(breaches, drift, trade_date, set(snapshot.get("active_alerts", [])))
+
+    plan = paper.plan_rebalance(quotes)
+    lines += [
+        f"{'买入' if o['side'] == 'buy' else '卖出'} {o['name']} {o['order_shares']} 股"
+        for o in plan["orders"]
+        if o["side"] != "hold"
+    ]
+
+    shown = lines[:TEST_TOAST_MAX_LINES]
+    if len(lines) > TEST_TOAST_MAX_LINES:
+        shown.append(f"…另有 {len(lines) - TEST_TOAST_MAX_LINES} 条")
+    sent = notify.send_toast(f"测试提醒 · {trade_date}", shown or ["当前没有任何越界、漂移或调仓建议"])
+    return {"sent": sent, "trade_date": trade_date, "count": len(lines), "lines": lines}
 
 
 def _alert_line(alert: dict) -> str:
@@ -305,6 +414,9 @@ def get_watchlist() -> list[dict]:
             "amount": quote.get("amount") or 0.0,
             "rsi": metrics.get("rsi"),
             "pct_1y": metrics.get("pct_1y"),
+            "div_yield": metrics.get("div_yield"),
+            "div_yield_pct": metrics.get("div_yield_pct"),
+            "volume_ratio": metrics.get("volume_ratio"),
             "adjusted": metrics.get("adjusted"),
             "change_pct": ((price - prev_close) / prev_close * 100) if prev_close else None,
         }

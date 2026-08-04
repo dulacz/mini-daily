@@ -196,6 +196,9 @@ def isolated_stocks(tmp_path, monkeypatch):
             "CREATE TABLE stock_daily (symbol TEXT NOT NULL, day TEXT NOT NULL, open REAL, high REAL, "
             "low REAL, close REAL NOT NULL, volume INTEGER, PRIMARY KEY (symbol, day))"
         )
+        # stock_alerts above is the pre-episode schema, so this also covers the migration.
+        db._add_episode_columns(conn, "stock_alerts")
+        db._add_daily_raw_column(conn)
     db.init_paper()  # run_job prices paper holdings in the same batch
     db.add_stock("sh600000", "浦发银行")
     return tmp_path
@@ -235,6 +238,67 @@ def test_run_job_alerts_once_per_day(isolated_stocks, monkeypatch):
     assert len(db.list_alerts()) == 2
 
 
+def test_alert_episode_counts_the_days_it_stayed_breached(isolated_stocks, monkeypatch):
+    _seed_rising_bars()
+    db.set_alert_settings(rsi_low=None, pct_low=None)
+    monkeypatch.setattr(stocks.notify, "send_toast", lambda title, lines: True)
+
+    for day in ("2026-08-03", "2026-08-04", "2026-08-05"):
+        monkeypatch.setattr(stocks, "_beijing_now", lambda d=day: __import__("datetime").datetime.fromisoformat(f"{d}T15:00:00"))
+        _stub_quotes(monkeypatch, 9.50, day)
+        stocks.run_job("1430")
+
+    alerts = {a["direction"]: a for a in db.list_alerts()}
+    assert len(alerts) == 2  # one episode per direction, not one row per day
+    assert alerts["rsi_high"]["trade_date"] == "2026-08-03"
+    assert alerts["rsi_high"]["last_date"] == "2026-08-05"
+    assert alerts["rsi_high"]["days"] == 3
+
+
+def test_run_job_stays_quiet_until_a_breach_clears(isolated_stocks, monkeypatch):
+    today = stocks._beijing_now().date().isoformat()
+    _seed_rising_bars()
+    db.set_alert_settings(rsi_low=None, pct_low=None)  # only watch the high side here
+    toasts = []
+    monkeypatch.setattr(stocks.notify, "send_toast", lambda title, lines: toasts.append(lines) or True)
+
+    _stub_quotes(monkeypatch, 9.50, today)
+    assert stocks.run_job("1430")["alerts"]  # first breach toasts
+    assert len(toasts) == 1
+
+    # A later day with the same breach still active must not toast again.
+    stocks._save_snapshot({**stocks.load_snapshot(), "runs_done": []})
+    assert stocks.run_job("1430")["alerts"] == []
+    assert len(toasts) == 1
+
+    # Once it clears and comes back, it is worth telling the user about.
+    _stub_quotes(monkeypatch, 1.00, today)
+    stocks.run_job("1430")
+    assert len(toasts) == 1
+    _stub_quotes(monkeypatch, 9.50, today)
+    assert stocks.run_job("1430")["alerts"]
+    assert len(toasts) == 2
+
+
+def test_failed_fetch_keeps_the_last_good_quotes(isolated_stocks, monkeypatch):
+    today = stocks._beijing_now().date().isoformat()
+    _stub_quotes(monkeypatch, 9.50, today)
+    _seed_rising_bars()
+    monkeypatch.setattr(stocks.notify, "send_toast", lambda title, lines: True)
+    stocks.run_job("1430")
+    assert stocks.get_watchlist()[0]["valid"] is True
+
+    def _boom(symbols, **kwargs):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(stocks.sina_quotes, "fetch_quotes", _boom)
+    stocks.run_job("manual")
+
+    row = stocks.get_watchlist()[0]
+    assert row["valid"] is True  # stale, but the page does not go blank
+    assert row["price"] == pytest.approx(9.50)
+
+
 def test_run_job_skips_alerts_on_non_trading_day(isolated_stocks, monkeypatch):
     _stub_quotes(monkeypatch, 9.50, "2020-01-01")
     _seed_rising_bars()
@@ -256,6 +320,73 @@ def test_watchlist_metrics(isolated_stocks, monkeypatch):
     assert sorted(row["breached"]) == ["pct_high", "rsi_high"]
     assert row["pct_1y"] == pytest.approx(100.0)
     assert row["change_pct"] == pytest.approx((9.50 - 8.99) / 8.99 * 100)
+
+
+def test_distribution_yield_from_adjusted_versus_raw_drift():
+    # Raw price flat at 10; adjusted grows 5% over the window -> the 5% was paid out.
+    window = 4
+    bars = [{"close": 10.0, "close_raw": 10.0} for _ in range(window)]
+    bars.append({"close": 10.5, "close_raw": 10.0})
+    assert stocks.distribution_yield_series(bars, window=window) == [pytest.approx(5.0)]
+
+    # A fund that pays nothing has identical series, so the yield reads zero.
+    flat = [{"close": 12.0, "close_raw": 12.0} for _ in range(window + 1)]
+    assert stocks.distribution_yield_series(flat, window=window) == [pytest.approx(0.0)]
+
+    # Price moves are divided out, so they do not leak into the yield.
+    moved = [{"close": 10.0, "close_raw": 10.0} for _ in range(window)]
+    moved.append({"close": 21.0, "close_raw": 20.0})
+    assert stocks.distribution_yield_series(moved, window=window) == [pytest.approx(5.0)]
+
+    # Missing raw closes are skipped rather than guessed.
+    gappy = [{"close": 10.0, "close_raw": None} for _ in range(window)]
+    gappy.append({"close": 10.5, "close_raw": 10.0})
+    assert stocks.distribution_yield_series(gappy, window=window) == []
+
+
+def test_percentile_uses_adjusted_closes_and_stores_raw(isolated_stocks, monkeypatch):
+    import datetime
+
+    start = datetime.date(2026, 1, 1)
+    days = [(start + datetime.timedelta(days=i)).isoformat() for i in range(80)]
+    monkeypatch.setattr(
+        stocks.kline,
+        "fetch_daily_bars",
+        # Adjusted marches up; the raw price just alternates between 1.0 and 1.5.
+        lambda symbol, count: (
+            [
+                {"day": d, "close": 1.0 + i * 0.05, "close_raw": 1.0 + (i % 2) * 0.5, "volume": 1}
+                for i, d in enumerate(days)
+            ],
+            True,
+        ),
+    )
+
+    metrics = stocks._refresh_metrics("sh600000", 1.0)
+    # 1.0 is the lowest of the 80 rising adjusted closes; the oscillating raw series
+    # would have put it at 25% instead, so this pins which series the percentile uses.
+    assert metrics["pct_1y"] == pytest.approx(0.625)
+
+    # Raw closes are still stored, because the dividend column is derived from them.
+    stored = db.get_daily_bars("sh600000", limit=100)
+    assert stored[0]["close_raw"] == pytest.approx(1.0)
+
+
+def test_alerts_hide_symbols_no_longer_watched(isolated_stocks, monkeypatch):
+    today = stocks._beijing_now().date().isoformat()
+    _stub_quotes(monkeypatch, 9.50, today)
+    _seed_rising_bars()
+    monkeypatch.setattr(stocks.notify, "send_toast", lambda title, lines: True)
+    stocks.run_job("1430")
+    assert len(db.list_alerts()) == 2
+
+    stock_id = db.list_stocks()[0]["id"]
+    db.delete_stock(stock_id)
+    # The rows survive in the table; they are simply no longer surfaced.
+    assert db.list_alerts() == []
+    with db.get_conn() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM stock_alerts").fetchone()[0] == 2
+
 
 def test_clearing_a_band_disables_that_alert(isolated_stocks, monkeypatch):
     today = stocks._beijing_now().date().isoformat()
@@ -379,13 +510,18 @@ def test_replace_daily_bars_drops_stale_adjustment(isolated_stocks):
     assert stored[0]["close"] == pytest.approx(1.9)
 
 
-def test_fetch_daily_bars_prefers_adjusted(monkeypatch):
-    monkeypatch.setattr(kline, "fetch_qfq_bars", lambda symbol, count: [{"day": "2026-01-02", "close": 1.9}])
-    monkeypatch.setattr(kline, "fetch_raw_bars", lambda symbol, count: pytest.fail("should not fall back"))
+def test_fetch_daily_bars_attaches_the_raw_close(monkeypatch):
+    monkeypatch.setattr(kline, "fetch_qfq_bars", lambda symbol, count: [
+        {"day": "2026-01-02", "close": 1.9},
+        {"day": "2026-01-05", "close": 2.0},
+    ])
+    monkeypatch.setattr(kline, "fetch_raw_bars", lambda symbol, count: [{"day": "2026-01-02", "close": 1.7}])
 
     bars, adjusted = kline.fetch_daily_bars("sh600000")
     assert adjusted is True
     assert bars[0]["close"] == 1.9
+    assert bars[0]["close_raw"] == 1.7
+    assert bars[1]["close_raw"] is None  # no raw bar for that day
 
 
 def test_fetch_daily_bars_falls_back_to_raw(monkeypatch):

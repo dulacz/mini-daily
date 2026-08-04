@@ -1,34 +1,55 @@
 /* A-share monitor page — layered on top of style.css + newsfeed.css */
 
 .newsfeed-container {
-    max-width: 1500px;
+    /* Matched to the positions table's natural width; extra width only pads the gaps
+       between columns, since the table stretches to fill whatever it is given. */
+    max-width: 1270px;
 }
 
 .stocks-main {
     display: flex;
     flex-direction: column;
-    gap: 2rem;
-    padding-bottom: 3rem;
+    gap: 1rem;
+    padding-bottom: 2rem;
 }
 
 .stocks-section {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 14px;
-    padding: 1.25rem 1.5rem 1.5rem;
+    padding: 0.9rem 1.1rem 1rem;
 }
 
 .section-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 1rem;
+    margin-bottom: 0.6rem;
 }
 
 .section-head h3 {
     margin: 0;
     font-size: 1.05rem;
     color: #e5e7eb;
+}
+
+.satori-link {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.8rem;
+    color: #a5b4fc;
+    text-decoration: none;
+}
+
+.satori-link:hover {
+    text-decoration: underline;
+}
+
+.satori-note {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.78rem;
+    color: #9ca3af;
 }
 
 .table-wrap {
@@ -48,6 +69,55 @@
     gap: 0.3rem;
     font-size: 0.8rem;
     color: #9ca3af;
+}
+
+/* Forces a flex row break so the drift controls sit together on their own line. */
+.settings-break {
+    flex-basis: 100%;
+    height: 0;
+}
+
+.settings-form label.settings-toggle input.toggle {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 42px;
+    /* paper.css sets a 150px min-width on every settings input, which would win over width. */
+    min-width: 42px;
+    height: 22px;
+    padding: 0;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    position: relative;
+    cursor: pointer;
+    align-self: flex-start;
+    margin: 0.35rem 0;
+    transition: background 0.15s;
+}
+
+.settings-form label.settings-toggle input.toggle::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    transition: transform 0.15s;
+}
+
+.settings-form label.settings-toggle input.toggle:checked {
+    background: #6366f1;
+    border-color: #6366f1;
+}
+
+.settings-form label.settings-toggle input.toggle:checked::after {
+    transform: translateX(20px);
+}
+
+.settings-form input:disabled {
+    opacity: 0.4;
 }
 
 .settings-form input {
@@ -73,7 +143,7 @@
 
 .stocks-table th,
 .stocks-table td {
-    padding: 0.6rem 0.75rem;
+    padding: 0.3rem 0.35rem;
     text-align: left;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     white-space: nowrap;
@@ -84,7 +154,6 @@
     font-weight: 600;
     font-size: 0.8rem;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
 }
 
 .stocks-table td.num,
@@ -123,9 +192,13 @@
     color: #9ca3af;
 }
 
-/* Red/green is reserved for price movement, so breaches use amber instead. */
-.row-breach {
-    background: rgba(251, 191, 36, 0.12);
+/* Row band shows direction; the breached value itself is amber so it reads as a warning. */
+.row-up {
+    background: rgba(248, 113, 113, 0.1);
+}
+
+.row-down {
+    background: rgba(74, 222, 128, 0.1);
 }
 
 .breach {

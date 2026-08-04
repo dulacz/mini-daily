@@ -4,11 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="A股价格监�?- Mini Daily">
+    <meta name="description" content="A股监测与模拟盘 - Mini Daily">
     <title>股票监测 - Mini Daily</title>
     <link rel="stylesheet" href="{{ static_url('style.css') }}">
     <link rel="stylesheet" href="{{ static_url('newsfeed.css') }}">
     <link rel="stylesheet" href="{{ static_url('stocks.css') }}">
+    <link rel="stylesheet" href="{{ static_url('paper.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -23,13 +24,12 @@
                 <h1>Mini Daily</h1>
             </div>
             <div class="nav-links">
-                <a href="/" class="nav-link">Daily Check-in</a>
-                <a href="/todo_coding" class="nav-link">Coding Problems</a>
+                <a href="/" class="nav-link">Check-in</a>
+                <a href="/todo_coding" class="nav-link">Coding</a>
                 <a href="/review_cards" class="nav-link">Anki</a>
                 {% if features.stocks %}<a href="/stocks" class="nav-link active">股票</a>{% endif %}
-                {% if features.paper %}<a href="/paper" class="nav-link">模拟�?/a>{% endif %}
-                    {% if features.newsfeed_s1 %}<a href="/newsfeed_s1" class="nav-link">S1 外野</a>{% endif %}
-                    {% if features.newsfeed_hn %}<a href="/newsfeed_hn" class="nav-link">Hacker News</a>{% endif %}
+                {% if features.newsfeed_s1 %}<a href="/newsfeed_s1" class="nav-link">S1 外野</a>{% endif %}
+                {% if features.newsfeed_hn %}<a href="/newsfeed_hn" class="nav-link">Hacker News</a>{% endif %}
             </div>
         </div>
     </nav>
@@ -37,17 +37,20 @@
     <div class="newsfeed-container">
         <header class="newsfeed-header">
             <div class="newsfeed-header-content">
-                <h2 class="newsfeed-title">📈 A股价格监�?/h2>
-                    <p class="newsfeed-subtitle">每个交易日北京时�?14:30 �?15:05 各抓取一次；指标均基于前复权（分红再投）价格，RSI(12) �?1
-                        年分位突破区间时弹出系统通知
-                    </p>
+                <h2 class="newsfeed-title">📈 A股监测</h2>
+                <p class="newsfeed-subtitle">
+                    每交易日 14:30 / 15:05 抓取，指标基于前复权价格；RSI、分位或持仓漂移越界时弹窗提醒。
+                </p>
             </div>
             <div class="newsfeed-meta">
-                <span class="meta-date" id="meta-date">加载中�?/span>
-                    <div class="meta-status-row">
-                        <button class="btn-refresh" id="btn-refresh" title="立即刷新">🔄 立即刷新</button>
-                        <span class="meta-status" id="meta-status"></span>
-                    </div>
+                <span class="meta-date" id="meta-date">加载中…</span>
+                <div class="meta-status-row">
+                    <button class="btn-refresh" id="btn-refresh" title="立即刷新">🔄 立即刷新</button>
+                    <span class="meta-status" id="meta-status"></span>
+                </div>
+                <a class="satori-link" id="satori-link" href="https://satori5.icu/#home" target="_blank"
+                    rel="noopener noreferrer">Satori 分析站</a>
+                <span class="satori-note" id="satori-note"></span>
             </div>
         </header>
 
@@ -58,44 +61,22 @@
         <!-- Loading state -->
         <div class="loading-state" id="loading-state">
             <div class="spinner"></div>
-            <p>正在加载行情�?/p>
+            <p>正在加载行情…</p>
         </div>
 
         <!-- Shown only when the page fails to load data -->
         <div class="empty-state" id="empty-state" style="display:none;">
             <div class="empty-icon">📭</div>
             <h3>加载失败</h3>
-            <p>无法读取自选列表，请刷新页面重试�?/p>
+            <p>无法读取数据，请刷新页面重试。</p>
         </div>
 
-        <!-- Watchlist -->
         <div class="stocks-main" id="stocks-main" style="display:none;">
+            <!-- Watchlist -->
             <section class="stocks-section">
                 <div class="section-head">
-                    <h3>警告区间 (全局)</h3>
-                    <span class="action-hint">对所有自选生效，修改后回车即时生效；留空则不监测那一�?/span>
-                </div>
-                <div class="settings-form">
-                    <label>RSI 超买�?
-                        <input type="number" id="set-rsi-high" step="1" min="0" max="100" autocomplete="off">
-                    </label>
-                    <label>RSI 超卖�?
-                        <input type="number" id="set-rsi-low" step="1" min="0" max="100" autocomplete="off">
-                    </label>
-                    <label>高分位线 % (1 年全收益)
-                        <input type="number" id="set-pct-high" step="1" min="0" max="100" autocomplete="off">
-                    </label>
-                    <label>低分位线 % (1 年全收益)
-                        <input type="number" id="set-pct-low" step="1" min="0" max="100" autocomplete="off">
-                    </label>
-                    <span class="modal-error" id="settings-error"></span>
-                </div>
-            </section>
-
-            <section class="stocks-section">
-                <div class="section-head">
-                    <h3>自选列�?/h3>
-                        <button class="btn-refresh" id="btn-add">�?添加股票</button>
+                    <h3>自选列表</h3>
+                    <button class="btn-refresh" id="btn-add">＋ 添加股票</button>
                 </div>
                 <div class="table-wrap">
                     <table class="stocks-table">
@@ -104,10 +85,11 @@
                                 <th>代码</th>
                                 <th>名称</th>
                                 <th class="num">现价</th>
-                                <th class="num">涨跌�?/th>
+                                <th class="num">涨跌幅</th>
                                 <th class="num">RSI(12)</th>
-                                <th class="num">分位1�?(全收�?</th>
-                                <th class="num">成交�?�?</th>
+                                <th class="num" title="近1年">前复权分位</th>
+                                <th class="num" title="近1年">分红率</th>
+                                <th class="num">成交量 (手)</th>
                                 <th>走势 (前复权，灰线=MA250)</th>
                                 <th>操作</th>
                             </tr>
@@ -117,6 +99,104 @@
                 </div>
             </section>
 
+            <!-- Account summary -->
+            <div class="summary-grid" id="summary-grid">
+                <div class="summary-card">
+                    <span class="summary-label">持仓市值</span>
+                    <span class="summary-value" id="sum-market">—</span>
+                    <span class="summary-sub" id="sum-market-weight"></span>
+                </div>
+                <div class="summary-card">
+                    <span class="summary-label">今日盈亏</span>
+                    <span class="summary-value" id="sum-day">—</span>
+                </div>
+                <div class="summary-card">
+                    <span class="summary-label">持仓盈亏</span>
+                    <span class="summary-value" id="sum-unrealized">—</span>
+                </div>
+                <div class="summary-card">
+                    <span class="summary-label">现金</span>
+                    <span class="summary-value" id="sum-cash">—</span>
+                    <span class="summary-sub" id="sum-cash-weight"></span>
+                </div>
+                <div class="summary-card">
+                    <span class="summary-label">账户资产</span>
+                    <span class="summary-value" id="sum-total">—</span>
+                    <span class="summary-sub" id="sum-return"></span>
+                </div>
+            </div>
+
+            <!-- Positions -->
+            <section class="stocks-section">
+                <div class="section-head">
+                    <h3>持仓</h3>
+                    <span class="action-hint" id="rebalance-summary"></span>
+                </div>
+                <span class="modal-error" id="positions-error"></span>
+                <div class="table-wrap">
+                    <table class="stocks-table">
+                        <thead>
+                            <tr>
+                                <th>代码</th>
+                                <th>名称</th>
+                                <th class="num">数量</th>
+                                <th class="num">成本价</th>
+                                <th class="num">现价</th>
+                                <th class="num">市值</th>
+                                <th class="num">今日盈亏</th>
+                                <th class="num">今日%</th>
+                                <th class="num">浮动盈亏</th>
+                                <th class="num">占比</th>
+                                <th class="num">目标</th>
+                                <th class="num">漂移</th>
+                                <th>再平衡</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positions-tbody"></tbody>
+                        <tfoot id="positions-tfoot"></tfoot>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Unified settings -->
+            <section class="stocks-section">
+                <div class="section-head">
+                    <h3>设置</h3>
+                    <div class="row-actions">
+                        <button class="btn-mini" id="btn-edit-account" title="修改现金余额与累计收益">修改资金</button>
+                        <button class="btn-mini" id="btn-test-toast" title="将当前越界、漂移与调仓建议发一条通知，并记入警告历史">测试弹窗</button>
+                    </div>
+                </div>
+                <div class="settings-form">
+                    <label>RSI 超买线
+                        <input type="number" id="set-rsi-high" step="1" min="0" max="100" autocomplete="off">
+                    </label>
+                    <label>RSI 超卖线
+                        <input type="number" id="set-rsi-low" step="1" min="0" max="100" autocomplete="off">
+                    </label>
+                    <label>高分位线 % (1 年全收益)
+                        <input type="number" id="set-pct-high" step="1" min="0" max="100" autocomplete="off">
+                    </label>
+                    <label>低分位线 % (1 年全收益)
+                        <input type="number" id="set-pct-low" step="1" min="0" max="100" autocomplete="off">
+                    </label>
+                    <div class="settings-break"></div>
+                    <label class="settings-toggle">监测漂移
+                        <input class="toggle" type="checkbox" id="field-drift-enabled"
+                            title="关闭后不再产生漂移警告与再平衡建议；目标权重为 0 的清仓仍保留">
+                    </label>
+                    <label>漂移容差 % (相对目标)
+                        <input type="number" id="field-tolerance" step="1" min="1" autocomplete="off">
+                    </label>
+                    <label>最小调仓金额
+                        <input type="number" id="field-min-trade" step="100" min="0" autocomplete="off">
+                    </label>
+                    <span class="modal-error" id="settings-error"></span>
+                </div>
+            </section>
+
+            <!-- Combined alert history -->
             <section class="stocks-section">
                 <div class="section-head">
                     <h3>警告历史</h3>
@@ -125,11 +205,12 @@
                     <table class="stocks-table">
                         <thead>
                             <tr>
-                                <th>交易�?/th>
+                                <th>交易日</th>
                                 <th>名称</th>
-                                <th>方向</th>
-                                <th class="num">触发�?/th>
-                                <th class="num">阈�?/th>
+                                <th>类型</th>
+                                <th class="num">触发值</th>
+                                <th class="num">阈值</th>
+                                <th class="num">持续天数</th>
                                 <th>触发时间</th>
                             </tr>
                         </thead>
@@ -140,7 +221,7 @@
         </div>
     </div>
 
-    <!-- Add / edit dialog -->
+    <!-- Add / rename dialog -->
     <div class="stock-modal" id="stock-modal" style="display:none;">
         <div class="stock-modal-card">
             <h3 id="modal-title">添加股票</h3>
@@ -148,12 +229,30 @@
                 <input type="text" id="field-symbol" placeholder="600519" autocomplete="off">
             </label>
             <label>名称
-                <input type="text" id="field-name" placeholder="留空则自动获�? autocomplete=" off">
+                <input type="text" id="field-name" placeholder="留空则自动获取" autocomplete="off">
             </label>
             <p class="modal-error" id="modal-error"></p>
             <div class="modal-actions">
                 <button class="btn-refresh" id="modal-cancel">取消</button>
                 <button class="btn-refresh btn-primary" id="modal-save">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cash / cumulative-return dialog -->
+    <div class="stock-modal" id="account-modal" style="display:none;">
+        <div class="stock-modal-card">
+            <h3>修改资金</h3>
+            <label>现金
+                <input type="number" id="field-cash" step="0.01" min="0" autocomplete="off">
+            </label>
+            <label>累计收益
+                <input type="number" id="field-return" step="0.01" autocomplete="off">
+            </label>
+            <p class="modal-error" id="account-modal-error"></p>
+            <div class="modal-actions">
+                <button class="btn-refresh" id="account-modal-cancel">取消</button>
+                <button class="btn-refresh btn-primary" id="account-modal-save">保存</button>
             </div>
         </div>
     </div>

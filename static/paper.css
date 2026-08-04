@@ -3,18 +3,17 @@
 .summary-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+    gap: 0.75rem;
 }
 
 .summary-card {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
-    padding: 0.9rem 1.1rem;
+    padding: 0.55rem 0.9rem;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.1rem;
 }
 
 .summary-label {
@@ -94,32 +93,6 @@
     border-color: #6366f1;
 }
 
-.stocks-section+.stocks-section {
-    margin-top: 2rem;
-}
-
-.weight-bar {
-    position: relative;
-    display: inline-block;
-    width: 70px;
-    height: 6px;
-    border-radius: 3px;
-    background: rgba(255, 255, 255, 0.1);
-    margin-left: 0.5rem;
-    vertical-align: middle;
-}
-
-.weight-bar span {
-    position: absolute;
-    inset: 0 auto 0 0;
-    border-radius: 3px;
-    background: #6366f1;
-}
-
-.row-drifted {
-    background: rgba(251, 191, 36, 0.12);
-}
-
 /* Direction supplies the colour, so exceeding tolerance is marked by weight only. */
 .drifted {
     font-weight: 600;
@@ -139,15 +112,31 @@
 }
 
 .cell-input {
-    width: 110px;
+    /* Sized to the widest value each column actually holds; see w-cost / w-target below. */
+    width: 68px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 6px;
-    /* Extra right padding keeps the right-aligned value clear of the spinner arrows. */
-    padding: 0.2rem 1.3rem 0.2rem 0.4rem;
+    padding: 0.2rem 0.4rem;
     color: #e5e7eb;
     font-size: 0.85rem;
     text-align: right;
+    /* Values are typed, not stepped, so the arrows are only visual noise. */
+    -moz-appearance: textfield;
+}
+
+.cell-input::-webkit-inner-spin-button,
+.cell-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.cell-input.w-target {
+    width: 40px;
+}
+
+.cell-input.w-cost {
+    width: 62px;
 }
 
 .cell-input:focus {
@@ -155,23 +144,25 @@
     border-color: #6366f1;
 }
 
-/* .btn-mini sets its own colour and is declared after .up/.down, so orders need their own tint. */
+/* Amber label marks the suggestion; the blue/purple background says buy or sell. */
+.btn-order {
+    color: #fbbf24;
+}
+
 .btn-order.buy {
-    color: #fca5a5;
-    border-color: rgba(248, 113, 113, 0.45);
-    background: rgba(248, 113, 113, 0.14);
+    border-color: rgba(167, 139, 250, 0.45);
+    background: rgba(167, 139, 250, 0.14);
 }
 
 .btn-order.buy:hover {
-    background: rgba(248, 113, 113, 0.26);
+    background: rgba(167, 139, 250, 0.26);
 }
 
 .btn-order.sell {
-    color: #86efac;
-    border-color: rgba(74, 222, 128, 0.45);
-    background: rgba(74, 222, 128, 0.14);
+    border-color: rgba(96, 165, 250, 0.45);
+    background: rgba(96, 165, 250, 0.14);
 }
 
 .btn-order.sell:hover {
-    background: rgba(74, 222, 128, 0.26);
+    background: rgba(96, 165, 250, 0.26);
 }

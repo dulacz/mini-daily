@@ -38,13 +38,12 @@ if (_BASE_DIR / "app" / "core" / "newsfeed_hn.py").exists() and (_BASE_DIR / "te
         print(f"Warning: Failed to import newsfeed_hn: {e}")
         newsfeed_hn = None
 
-from .core import paper, sina_quotes, stocks
+from .core import paper, satori, sina_quotes, stocks
 
 FEATURES = {
     "newsfeed_s1": newsfeed_s1 is not None,
     "newsfeed_hn": newsfeed_hn is not None,
     "stocks": True,
-    "paper": True,
 }
 
 app = FastAPI(title="Daily Check-in - Simplified")
@@ -446,6 +445,17 @@ async def api_stocks_run():
     return {"started": True, "message": "Job started in background"}
 
 
+@app.post("/api/stocks/test-toast")
+def api_stocks_test_toast():
+    """Notify and record everything currently breaching, so the toast path can be checked on demand."""
+    return stocks.run_alert_test()
+
+
+@app.get("/api/stocks/market-note")
+def api_stocks_market_note():
+    return satori.fetch_market_note()
+
+
 @app.post("/api/stocks/add")
 async def api_stocks_add(req: StockAddRequest):
     try:
@@ -488,9 +498,14 @@ class PaperCashRequest(BaseModel):
     cash: float = Field(ge=0)
 
 
+class PaperNetDepositRequest(BaseModel):
+    net_deposit: float
+
+
 class PaperSettingsRequest(BaseModel):
     drift_tolerance_pct: float = Field(gt=0, le=1000)
     min_trade_amount: Optional[float] = Field(default=None, ge=0)
+    drift_enabled: Optional[bool] = None
 
 
 class PaperTargetRequest(BaseModel):
@@ -508,13 +523,10 @@ class PaperSharesRequest(BaseModel):
     shares: int = Field(ge=0)
 
 
-@app.get("/paper", response_class=HTMLResponse)
-async def paper_page(request: Request):
-    return templates.TemplateResponse(request, "paper.html")
-
-
+# These hit SQLite and Sina synchronously, so they stay non-async and run in the threadpool;
+# as coroutines they would block the event loop and serialise every other request.
 @app.get("/api/paper/portfolio")
-async def api_paper_portfolio():
+def api_paper_portfolio():
     return paper.build_portfolio()
 
 
@@ -524,12 +536,12 @@ async def api_paper_alerts(limit: int = 50):
 
 
 @app.get("/api/paper/rebalance")
-async def api_paper_rebalance():
+def api_paper_rebalance():
     return paper.plan_rebalance()
 
 
 @app.post("/api/paper/rebalance/execute")
-async def api_paper_rebalance_execute():
+def api_paper_rebalance_execute():
     try:
         return {"success": True, **paper.execute_rebalance()}
     except ValueError as e:
@@ -545,17 +557,23 @@ async def api_paper_cash(req: PaperCashRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.post("/api/paper/net-deposit")
+async def api_paper_net_deposit(req: PaperNetDepositRequest):
+    db.set_paper_net_deposit(req.net_deposit)
+    return {"success": True}
+
+
 @app.post("/api/paper/settings")
 async def api_paper_settings(req: PaperSettingsRequest):
     try:
-        db.set_paper_settings(req.drift_tolerance_pct, req.min_trade_amount)
+        db.set_paper_settings(req.drift_tolerance_pct, req.min_trade_amount, req.drift_enabled)
         return {"success": True}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/api/paper/trade")
-async def api_paper_trade(req: PaperTradeRequest):
+def api_paper_trade(req: PaperTradeRequest):
     try:
         return {"success": True, "trade": paper.trade(req.symbol, req.side, req.shares)}
     except ValueError as e:
@@ -563,7 +581,7 @@ async def api_paper_trade(req: PaperTradeRequest):
 
 
 @app.post("/api/paper/target")
-async def api_paper_target(req: PaperTargetRequest):
+def api_paper_target(req: PaperTargetRequest):
     try:
         paper.set_target(req.symbol, req.target_weight)
         return {"success": True}
@@ -581,7 +599,7 @@ async def api_paper_cost(req: PaperCostRequest):
 
 
 @app.post("/api/paper/shares")
-async def api_paper_shares(req: PaperSharesRequest):
+def api_paper_shares(req: PaperSharesRequest):
     """Set an absolute share count, trading the difference at the live price."""
     try:
         return {"success": True, "trade": paper.set_shares(req.symbol, req.shares)}

@@ -23,6 +23,7 @@ def account(tmp_path, monkeypatch):
     db.init_paper()
     db.set_paper_cash(100_000)
     db.set_paper_settings(drift_tolerance_pct=20, min_trade_amount=0)
+    paper._quote_cache.clear()  # module-level cache would leak prices between tests
     return prices
 
 
@@ -41,6 +42,30 @@ def test_buy_updates_cash_and_position(account):
     assert position["avg_cost"] == pytest.approx(100.0)
     assert position["unrealized_pnl"] == pytest.approx(0.0)
     assert position["weight_pct"] == pytest.approx(10.0)
+
+
+def test_cumulative_return_survives_selling_and_deleting(account, monkeypatch):
+    # The fixture funded the account with 100k, so that is the deposit baseline.
+    assert paper.build_portfolio()["total_return"] == pytest.approx(0.0)
+
+    paper.trade("600519", "buy", 200)  # 20k at 100
+    monkeypatch.setattr(
+        paper.sina_quotes,
+        "fetch_quotes",
+        lambda symbols: {s: {"valid": True, "price": 150.0, "name": "X"} for s in symbols},
+    )
+    paper.trade("600519", "sell", 200)  # +10k realised, straight into cash
+    db.delete_paper_position("sh600519")
+
+    portfolio = paper.build_portfolio()
+    assert portfolio["positions"] == []
+    assert portfolio["total_unrealized_pnl"] == pytest.approx(0.0)  # nothing is held
+    assert portfolio["total_return"] == pytest.approx(10_000)  # but the gain still shows
+    assert portfolio["total_return_pct"] == pytest.approx(10.0)
+
+    # Paying more money in must not read as profit.
+    db.set_paper_cash(portfolio["cash"] + 50_000)
+    assert paper.build_portfolio()["total_return"] == pytest.approx(10_000)
 
 
 def test_buy_rejects_insufficient_cash(account):
@@ -62,9 +87,8 @@ def test_sell_realizes_pnl_and_keeps_avg_cost(account, monkeypatch):
     position = portfolio["positions"][0]
     assert position["shares"] == 100
     assert position["avg_cost"] == pytest.approx(100.0)
-    assert position["realized_pnl"] == pytest.approx(2_000)
     assert position["unrealized_pnl"] == pytest.approx(2_000)
-    assert position["total_pnl"] == pytest.approx(4_000)
+    assert "realized_pnl" not in position
     assert portfolio["cash"] == pytest.approx(100_000 - 20_000 + 12_000)
 
 
@@ -80,23 +104,44 @@ def test_relative_drift_math():
     assert paper._relative_drift(10.0, None) is None
 
 
-def test_drift_alert_fires_once_per_day(account):
+def test_drift_alert_records_once_per_day(account):
     paper.trade("600519", "buy", 300)  # 30% of 100k
     paper.set_target("600519", 20)  # +50% relative drift, tolerance 20%
 
-    first = paper.check_drift("2026-08-03", {})
-    assert [a["direction"] for a in first] == ["over"]
-    assert first[0]["drift_pct"] == pytest.approx(50.0)
+    drifted = paper.drifted_holdings({})
+    assert [a["direction"] for a in drifted] == ["over"]
+    assert drifted[0]["drift_pct"] == pytest.approx(50.0)
 
-    assert paper.check_drift("2026-08-03", {}) == []
-    assert len(db.list_paper_alerts()) == 1
+    # Reported for as long as it stays out of band; run_job decides what is worth a toast.
+    assert [a["direction"] for a in paper.drifted_holdings({})] == ["over"]
+
+
+def test_disabling_drift_silences_alerts_but_keeps_exits(account):
+    paper.trade("600519", "buy", 300)  # 30% against a 20% target -> +50% drift
+    paper.set_target("600519", 20)
+    paper.set_target("000001", 80)
+    assert paper.drifted_holdings({})  # baseline: monitoring on
+
+    db.set_paper_settings(drift_tolerance_pct=20, min_trade_amount=0, drift_enabled=False)
+
+    portfolio = paper.build_portfolio()
+    assert portfolio["drift_enabled"] is False
+    assert all(not p["drifted"] for p in portfolio["positions"])
+    assert portfolio["positions"][1]["drift_pct"] is not None  # still shown, just not flagged
+    assert paper.drifted_holdings({}) == []
+    assert {o["side"] for o in paper.plan_rebalance()["orders"]} == {"hold"}
+
+    # A zero target still has to be able to exit.
+    paper.set_target("600519", 0)
+    orders = {o["code"]: o["side"] for o in paper.plan_rebalance()["orders"]}
+    assert orders["600519"] == "sell"
 
 
 def test_no_drift_alert_inside_tolerance(account):
     paper.trade("sh600519", "buy", 220)  # 22% of 100k
     paper.set_target("sh600519", 20)  # +10% relative, under the 20% tolerance
 
-    assert paper.check_drift("2026-08-03", {}) == []
+    assert paper.drifted_holdings({}) == []
 
 
 def test_no_drift_alert_when_prices_missing(account, monkeypatch):
@@ -110,7 +155,7 @@ def test_no_drift_alert_when_prices_missing(account, monkeypatch):
     portfolio = paper.build_portfolio({})
     assert portfolio["prices_complete"] is False
     assert portfolio["positions"][0]["priced"] is False
-    assert paper.check_drift("2026-08-03", {}) == []
+    assert paper.drifted_holdings({}) == []
     assert db.list_paper_alerts() == []
 
 
@@ -135,7 +180,6 @@ def test_no_phantom_gain_from_float_residue(account, monkeypatch):
 
     position = paper.build_portfolio()["positions"][0]
     assert position["unrealized_pnl"] == 0.0
-    assert position["total_pnl"] == 0.0
 
 
 def test_delete_position_requires_flat(account):
@@ -181,7 +225,8 @@ def test_positions_sorted_by_code(account):
 
 def test_paper_api_endpoints():
     with TestClient(app) as client:
-        assert client.get("/paper").status_code == 200
+        # The paper page was merged into /stocks; only the APIs remain.
+        assert client.get("/paper").status_code == 404
         assert "positions" in client.get("/api/paper/portfolio").json()
         assert "alerts" in client.get("/api/paper/alerts").json()
         assert "orders" in client.get("/api/paper/rebalance").json()
@@ -221,6 +266,22 @@ def test_rebalance_sells_overweight_and_buys_underweight(account):
     assert orders["600519"]["projected_value"] == pytest.approx(30_000, abs=100)
     assert orders["000001"]["projected_value"] == pytest.approx(70_000, abs=100)
     assert plan["cash_after"] < 100 * 100  # less than one lot of the pricier name
+
+
+def test_rebalance_leaves_holdings_inside_the_tolerance_band(account):
+    # 60k in 000001 and 40k cash: weight 60% against a 58% target is only +3.4% relative drift.
+    paper.trade("000001", "buy", 6_000)
+    paper.set_target("000001", 58)
+    paper.set_target("600519", 42)
+    db.set_paper_settings(drift_tolerance_pct=20, min_trade_amount=0)
+
+    orders = {o["code"]: o for o in paper.plan_rebalance()["orders"]}
+    assert orders["000001"]["side"] == "hold"  # inside the band, left alone
+    assert orders["600519"]["side"] == "buy"  # holds nothing, so -100% drift
+
+    # Tightening the band brings the settled holding back into scope.
+    db.set_paper_settings(drift_tolerance_pct=1, min_trade_amount=0)
+    assert {o["code"]: o["side"] for o in paper.plan_rebalance()["orders"]}["000001"] == "sell"
 
 
 def test_rebalance_orders_are_whole_lots(account):

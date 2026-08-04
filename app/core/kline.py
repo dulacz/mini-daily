@@ -101,8 +101,17 @@ def fetch_raw_bars(symbol: str, count: int = 1023) -> list[dict]:
 
 def fetch_daily_bars(symbol: str, count: int = MAX_QFQ_BARS) -> tuple[list[dict], bool]:
     """Return (bars, adjusted). Falls back to unadjusted Sina bars for symbols
-    Tencent does not cover, such as Beijing-exchange listings."""
+    Tencent does not cover, such as Beijing-exchange listings.
+
+    Each bar also carries close_raw, the unadjusted close. Adjusted closes drift
+    upward with reinvested dividends, so anything measuring price *level* rather
+    than *return* has to use the raw series instead.
+    """
     bars = fetch_qfq_bars(symbol, count)
-    if bars:
-        return bars, True
-    return fetch_raw_bars(symbol, count), False
+    if not bars:
+        return fetch_raw_bars(symbol, count), False
+
+    raw_by_day = {b["day"]: b["close"] for b in fetch_raw_bars(symbol, count)}
+    for bar in bars:
+        bar["close_raw"] = raw_by_day.get(bar["day"])
+    return bars, True
